@@ -110,7 +110,6 @@ async function startDrag(e: MouseEvent) {
 }
 
 function onDragMove(e: MouseEvent) {
-    console.log('[Drag] Moving');
     if (!state.isDragging) return;
 
     // Calculate absolute target position based on initial position + mouse movement

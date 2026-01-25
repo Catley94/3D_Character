@@ -3,6 +3,12 @@ import { state } from './store';
 export function setupClickThrough() {
     console.log('[Interactions] Setting up click-through (Polling Mode)...');
 
+    // LINUX/WAYLAND NOTE:
+    // We use a POLLING strategy ("Radar") because standard 'forward: true' event forwarding
+    // is unreliable on Linux/Wayland. The browser often triggers 'mouseleave' immediately
+    // when transparency is enabled, breaking interaction.
+    // Solution: We verify global cursor position manually every 100ms.
+
     const character = document.getElementById('character');
     const backpack = document.getElementById('backpack');
     const speechBubble = document.getElementById('speech-bubble');
