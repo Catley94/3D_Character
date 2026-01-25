@@ -26,6 +26,7 @@ const settingsPanel = document.getElementById('settings-panel');
 // Settings form elements
 const apiProvider = document.getElementById('api-provider');
 const apiKey = document.getElementById('api-key');
+const geminiModel = document.getElementById('gemini-model');
 const characterName = document.getElementById('character-name');
 const themeSelect = document.getElementById('theme-select');
 const personalityCheckboxes = document.querySelectorAll('#personality-traits input');
@@ -45,6 +46,7 @@ async function init() {
 function applyConfig(cfg) {
     apiProvider.value = cfg.provider || 'gemini';
     apiKey.value = cfg.apiKey || '';
+    geminiModel.value = cfg.geminiModel || 'gemini-2.0-flash';
     characterName.value = cfg.characterName || 'Foxy';
     themeSelect.value = cfg.theme || 'fox';
 
@@ -238,12 +240,11 @@ chatInput.addEventListener('keypress', (e) => {
 });
 
 // ===== Window Dragging =====
-const dragHandle = document.getElementById('drag-handle');
 let isDragging = false;
 let dragStartMouseX, dragStartMouseY;
 let dragStartWinX, dragStartWinY;
 
-// Start drag from character image OR drag handle
+// Start drag from character
 async function startDrag(e) {
     // Don't start drag if clicking on backpack/settings button
     if (e.target === backpack || backpack.contains(e.target)) return;
@@ -258,7 +259,6 @@ async function startDrag(e) {
     e.preventDefault();
 }
 
-dragHandle.addEventListener('mousedown', startDrag);
 character.addEventListener('mousedown', startDrag);
 
 document.addEventListener('mousemove', (e) => {
@@ -301,6 +301,7 @@ saveSettingsBtn.addEventListener('click', async () => {
     config = {
         provider: apiProvider.value,
         apiKey: apiKey.value,
+        geminiModel: geminiModel.value,
         characterName: characterName.value,
         theme: themeSelect.value,
         personality: selectedPersonality,

@@ -4,13 +4,15 @@ const path = require('path');
 let mainWindow;
 let tray;
 let isDev = process.argv.includes('--dev');
+const FIXED_WIDTH = 320;
+const FIXED_HEIGHT = 300;
 
 function createWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
 
   mainWindow = new BrowserWindow({
-    width: 320,
-    height: 280,
+    width: FIXED_WIDTH,
+    height: FIXED_HEIGHT,
     x: width - 340,
     y: height - 300,
     frame: false,
@@ -69,26 +71,42 @@ function createTray() {
 
 // IPC Handlers for AI communication
 ipcMain.handle('send-message', async (event, { message, config }) => {
+  const fs = require('fs');
+  const logPath = path.join(__dirname, '../../conversation_log.txt');
+
+  // Log the user message
+  const timestamp = new Date().toISOString();
+  fs.appendFileSync(logPath, `\n[${timestamp}] USER: ${message}\n`);
+
   try {
     const { GoogleGenerativeAI } = require('@google/generative-ai');
 
     if (!config.apiKey) {
-      return { error: 'Please set your API key in settings!' };
+      const errorMsg = 'Please set your API key in settings!';
+      fs.appendFileSync(logPath, `[${timestamp}] ERROR: ${errorMsg}\n`);
+      return { error: errorMsg };
     }
 
     const genAI = new GoogleGenerativeAI(config.apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const selectedModel = config.geminiModel || 'gemini-2.0-flash';
+    const model = genAI.getGenerativeModel({ model: selectedModel });
+    fs.appendFileSync(logPath, `[${timestamp}] USING MODEL: ${selectedModel}\n`);
 
     const systemPrompt = buildSystemPrompt(config.personality, config.characterName);
+    fs.appendFileSync(logPath, `[${timestamp}] SYSTEM PROMPT: ${systemPrompt}\n`);
 
     const result = await model.generateContent([
       { text: systemPrompt },
       { text: message }
     ]);
 
-    return { response: result.response.text() };
+    const responseText = result.response.text();
+    fs.appendFileSync(logPath, `[${timestamp}] AI RESPONSE: ${responseText}\n`);
+
+    return { response: responseText };
   } catch (error) {
     console.error('AI Error:', error);
+    fs.appendFileSync(logPath, `[${timestamp}] AI ERROR: ${error.message}\n[${timestamp}] FULL ERROR: ${JSON.stringify(error, null, 2)}\n`);
     return { error: error.message };
   }
 });
@@ -133,8 +151,7 @@ app.whenReady().then(() => {
 
   // Handle window dragging - Using absolute position approach
   // WORKAROUND: On Linux with transparent windows, normal setPosition causes issues
-  const FIXED_WIDTH = 320;
-  const FIXED_HEIGHT = 280;
+
 
   // Get current window bounds (for calculating initial position on drag start)
   ipcMain.handle('get-window-bounds', () => {
