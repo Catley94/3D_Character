@@ -4,8 +4,8 @@ const path = require('path');
 let mainWindow;
 let tray;
 let isDev = process.argv.includes('--dev');
-const FIXED_WIDTH = 320;
-const FIXED_HEIGHT = 300;
+const FIXED_WIDTH = 350;
+const FIXED_HEIGHT = 450;
 
 function createWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
@@ -153,6 +153,7 @@ app.whenReady().then(() => {
   // WORKAROUND: On Linux with transparent windows, normal setPosition causes issues
 
 
+
   // Get current window bounds (for calculating initial position on drag start)
   ipcMain.handle('get-window-bounds', () => {
     if (mainWindow) {
@@ -161,14 +162,26 @@ app.whenReady().then(() => {
     return { x: 0, y: 0, width: FIXED_WIDTH, height: FIXED_HEIGHT };
   });
 
-  // Set window to absolute position (maintaining fixed size)
-  ipcMain.on('set-window-position', (event, { x, y }) => {
+  // Set window size dynamically based on content
+  ipcMain.on('set-window-size', (event, { width, height }) => {
     if (mainWindow) {
+      mainWindow.setSize(width || FIXED_WIDTH, height || FIXED_HEIGHT);
+    }
+  });
+
+  // Set window to absolute position (maintaining CURRENT size OR explicit size)
+  ipcMain.on('set-window-position', (event, { x, y, width, height }) => {
+    if (mainWindow) {
+      // Use passed dimensions if available (prevent growth bug), else current bounds
+      const currentBounds = mainWindow.getBounds();
+      const w = width || currentBounds.width;
+      const h = height || currentBounds.height;
+
       mainWindow.setBounds({
         x: Math.round(x),
         y: Math.round(y),
-        width: FIXED_WIDTH,
-        height: FIXED_HEIGHT
+        width: w,
+        height: h
       });
     }
   });

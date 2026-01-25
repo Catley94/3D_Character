@@ -11,6 +11,8 @@ let config = {};
 let conversationHistory = [];
 let idleTimeout = null;
 const IDLE_TIMEOUT_MS = 15000; // Return to idle after 15 seconds of no input
+let isTyping = false;
+let hasDragged = false;
 
 // ===== DOM Elements =====
 const character = document.getElementById('character');
@@ -27,6 +29,7 @@ const settingsPanel = document.getElementById('settings-panel');
 const apiProvider = document.getElementById('api-provider');
 const apiKey = document.getElementById('api-key');
 const geminiModel = document.getElementById('gemini-model');
+const customModelInput = document.getElementById('custom-model-input');
 const characterName = document.getElementById('character-name');
 const themeSelect = document.getElementById('theme-select');
 const personalityCheckboxes = document.querySelectorAll('#personality-traits input');
@@ -41,12 +44,28 @@ async function init() {
 
     // Listen for settings open from tray
     window.electronAPI.onOpenSettings(() => openSettings());
+
+    // Setup click-through: enable clicking when mouse enters interactive elements
+    // setupClickThrough();
 }
 
 function applyConfig(cfg) {
     apiProvider.value = cfg.provider || 'gemini';
     apiKey.value = cfg.apiKey || '';
-    geminiModel.value = cfg.geminiModel || 'gemini-2.0-flash';
+
+    // Handle custom model
+    const savedModel = cfg.geminiModel || 'gemini-2.0-flash';
+    const isCustom = !Array.from(geminiModel.options).some(opt => opt.value === savedModel);
+
+    if (isCustom) {
+        geminiModel.value = 'custom';
+        customModelInput.value = savedModel;
+        customModelInput.classList.remove('hidden');
+    } else {
+        geminiModel.value = savedModel;
+        customModelInput.classList.add('hidden');
+    }
+
     characterName.value = cfg.characterName || 'Foxy';
     themeSelect.value = cfg.theme || 'fox';
 
@@ -62,6 +81,16 @@ function applyConfig(cfg) {
     // Update character image based on theme
     updateCharacterTheme(cfg.theme || 'fox');
 }
+
+// Toggle custom model input
+geminiModel.addEventListener('change', () => {
+    if (geminiModel.value === 'custom') {
+        customModelInput.classList.remove('hidden');
+        customModelInput.focus();
+    } else {
+        customModelInput.classList.add('hidden');
+    }
+});
 
 function updateCharacterTheme(theme) {
     const basePath = `../../assets/themes/${theme}`;
@@ -109,8 +138,8 @@ character.addEventListener('click', (e) => {
     // Ignore clicks on backpack
     if (e.target === backpack || backpack.contains(e.target)) return;
 
-    // If already showing input, don't react again
-    if (!chatInputContainer.classList.contains('hidden')) return;
+    // If already showing input or typing, don't react again
+    if (!chatInputContainer.classList.contains('hidden') || isTyping || hasDragged) return;
 
     handleCharacterClick();
 });
@@ -129,6 +158,22 @@ function handleCharacterClick() {
 }
 
 // ===== Speech Bubble =====
+const BASE_HEIGHT = 450;
+const EXTRA_PADDING = 50;
+
+function updateWindowHeight() {
+    const bubbleHeight = speechBubble.offsetHeight;
+    if (!speechBubble.classList.contains('hidden') && bubbleHeight > 100) {
+        // Calculate new total height required (base height + extra bubble height)
+        // Base window is set for roughly 100px bubble. If bigger, grow window.
+        // Or simply: 300px (character) + bubbleHeight + padding
+        const newHeight = 350 + bubbleHeight + EXTRA_PADDING;
+        window.electronAPI.setWindowSize(350, Math.max(BASE_HEIGHT, newHeight));
+    } else {
+        window.electronAPI.setWindowSize(350, BASE_HEIGHT);
+    }
+}
+
 function showSpeechBubble(text, animate = true) {
     speechBubble.classList.remove('hidden');
 
@@ -136,27 +181,51 @@ function showSpeechBubble(text, animate = true) {
         typeText(text);
     } else {
         bubbleText.textContent = text;
+        // Update size immediately for static text
+        setTimeout(updateWindowHeight, 50);
     }
 }
 
 function hideSpeechBubble() {
     speechBubble.classList.add('hidden');
     bubbleText.textContent = '';
+    window.electronAPI.setWindowSize(350, BASE_HEIGHT);
 }
 
 async function typeText(text) {
-    bubbleText.innerHTML = '';
-    const cursor = document.createElement('span');
-    cursor.className = 'typing-cursor';
+    if (isTyping) return;
+    isTyping = true;
 
-    for (let i = 0; i < text.length; i++) {
-        bubbleText.textContent = text.substring(0, i + 1);
-        bubbleText.appendChild(cursor);
-        await sleep(30 + Math.random() * 20);
+    try {
+        bubbleText.innerHTML = '';
+        const cursor = document.createElement('span');
+        cursor.className = 'typing-cursor';
+
+        for (let i = 0; i < text.length; i++) {
+            // Stop typing if bubble was hidden or state changed
+            if (speechBubble.classList.contains('hidden')) break;
+
+            bubbleText.textContent = text.substring(0, i + 1);
+            bubbleText.appendChild(cursor);
+
+            // Check if height changed and resize window if needed
+            if (i % 10 === 0) updateWindowHeight();
+
+            await sleep(30 + Math.random() * 20);
+        }
+
+        updateWindowHeight(); // Final update
+
+        // Remove cursor after typing
+        setTimeout(() => {
+            if (cursor.parentNode) cursor.remove();
+        }, 1000);
+    } catch (e) {
+        console.error('Typing error:', e);
+        bubbleText.textContent = text; // Fallback to full text
+    } finally {
+        isTyping = false;
     }
-
-    // Remove cursor after typing
-    setTimeout(() => cursor.remove(), 1000);
 }
 
 function sleep(ms) {
@@ -202,7 +271,13 @@ async function sendMessage() {
     const message = chatInput.value.trim();
     if (!message) return;
 
-    hideChatInput();
+    // Clear input but keep visible
+    chatInput.value = '';
+    chatInput.disabled = true; // Disable while thinking
+
+    // Reset idle timeout so we don't disappear while thinking
+    clearIdleTimeout();
+
     setState(CharacterState.LISTENING);
     showSpeechBubble('Hmm, let me think... 🤔', false);
 
@@ -217,20 +292,29 @@ async function sendMessage() {
             await showSpeechBubble(result.response);
         }
 
-        // Return to idle after showing response
-        setTimeout(() => {
-            setState(CharacterState.IDLE);
-            // Keep bubble visible for reading, hide after delay
-            setTimeout(() => {
-                hideSpeechBubble();
-            }, 5000);
-        }, 2000);
+        // Re-enable input for next message
+        chatInput.disabled = false;
+        chatInput.focus();
+
+        // Return to listening state for next input
+        setState(CharacterState.LISTENING);
+
+        // Start new idle timeout
+        idleTimeout = setTimeout(() => {
+            returnToIdle("I'll just take a nap then! 😴");
+        }, IDLE_TIMEOUT_MS);
 
     } catch (error) {
         console.error('Error sending message:', error);
         setState(CharacterState.TALKING);
         showSpeechBubble("Something went wrong! 😵");
-        setTimeout(() => setState(CharacterState.IDLE), 2000);
+
+        // Re-enable even on error
+        setTimeout(() => {
+            chatInput.disabled = false;
+            chatInput.focus();
+            setState(CharacterState.LISTENING);
+        }, 2000);
     }
 }
 
@@ -239,10 +323,21 @@ chatInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') sendMessage();
 });
 
+// Reset idle timeout while typing
+chatInput.addEventListener('input', () => {
+    if (idleTimeout) {
+        clearIdleTimeout();
+        idleTimeout = setTimeout(() => {
+            returnToIdle("Still there? I'm going to nap! 😴");
+        }, IDLE_TIMEOUT_MS);
+    }
+});
+
 // ===== Window Dragging =====
 let isDragging = false;
 let dragStartMouseX, dragStartMouseY;
 let dragStartWinX, dragStartWinY;
+let dragStartWidth, dragStartHeight;
 
 // Start drag from character
 async function startDrag(e) {
@@ -250,12 +345,17 @@ async function startDrag(e) {
     if (e.target === backpack || backpack.contains(e.target)) return;
 
     isDragging = true;
+    hasDragged = false;
     dragStartMouseX = e.screenX;
     dragStartMouseY = e.screenY;
-    // Get initial window position
+
+    // Get initial window position AND size
     const bounds = await window.electronAPI.getWindowBounds();
     dragStartWinX = bounds.x;
     dragStartWinY = bounds.y;
+    dragStartWidth = bounds.width;
+    dragStartHeight = bounds.height;
+
     e.preventDefault();
 }
 
@@ -268,7 +368,12 @@ document.addEventListener('mousemove', (e) => {
     const targetX = dragStartWinX + (e.screenX - dragStartMouseX);
     const targetY = dragStartWinY + (e.screenY - dragStartMouseY);
 
-    window.electronAPI.setWindowPosition(targetX, targetY);
+    if (Math.abs(e.screenX - dragStartMouseX) > 3 || Math.abs(e.screenY - dragStartMouseY) > 3) {
+        hasDragged = true;
+    }
+
+    // Force strict size maintenance during drag
+    window.electronAPI.setWindowPosition(targetX, targetY, dragStartWidth, dragStartHeight);
 });
 
 document.addEventListener('mouseup', () => {
@@ -298,10 +403,16 @@ saveSettingsBtn.addEventListener('click', async () => {
         if (cb.checked) selectedPersonality.push(cb.value);
     });
 
+    // Determine model to save
+    let modelToSave = geminiModel.value;
+    if (modelToSave === 'custom') {
+        modelToSave = customModelInput.value.trim() || 'gemini-2.0-flash';
+    }
+
     config = {
         provider: apiProvider.value,
         apiKey: apiKey.value,
-        geminiModel: geminiModel.value,
+        geminiModel: modelToSave,
         characterName: characterName.value,
         theme: themeSelect.value,
         personality: selectedPersonality,

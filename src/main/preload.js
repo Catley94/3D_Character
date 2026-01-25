@@ -4,7 +4,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Window controls
     dragWindow: (deltaX, deltaY) => ipcRenderer.send('window-drag', { deltaX, deltaY }),
     getWindowBounds: () => ipcRenderer.invoke('get-window-bounds'),
-    setWindowPosition: (x, y) => ipcRenderer.send('set-window-position', { x, y }),
+    setWindowPosition: (x, y, width, height) => ipcRenderer.send('set-window-position', { x, y, width, height }),
+    setWindowSize: (width, height) => ipcRenderer.send('set-window-size', { width, height }),
 
     // Click-through control
     setIgnoreMouseEvents: (ignore, options) => ipcRenderer.send('set-ignore-mouse-events', ignore, options),
