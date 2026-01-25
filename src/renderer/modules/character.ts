@@ -37,7 +37,7 @@ export function setState(newState: CharacterStateValue) {
 
     // Update character image based on state and theme
     const theme = state.config.theme || 'fox';
-    const basePath = `assets/themes/${theme}`;
+    const basePath = `themes/${theme}`;
 
     switch (newState) {
         case CharacterState.CLICKED:
@@ -55,7 +55,7 @@ export function setState(newState: CharacterStateValue) {
 }
 
 export function updateCharacterTheme(theme: string) {
-    const basePath = `assets/themes/${theme}`;
+    const basePath = `themes/${theme}`;
     characterImg.src = `${basePath}/idle.png`;
 }
 

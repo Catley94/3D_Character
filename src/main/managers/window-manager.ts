@@ -5,12 +5,24 @@ export class WindowManager {
     private mainWindow: BrowserWindow | null = null;
     private readonly MIN_WIDTH = 200;
     private readonly MIN_HEIGHT = 200;
-    private readonly DIST: string;
     private readonly VITE_DEV_SERVER_URL: string | undefined;
 
     constructor() {
-        this.DIST = path.join(__dirname, '../../dist');
         this.VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
+    }
+
+    private getDistPath(): string {
+        if (app.isPackaged) {
+            return path.join(process.resourcesPath, 'app.asar', 'dist');
+        }
+        return path.join(__dirname, '../../dist');
+    }
+
+    private getPreloadPath(): string {
+        if (app.isPackaged) {
+            return path.join(process.resourcesPath, 'app.asar', 'dist-electron', 'preload.js');
+        }
+        return path.join(__dirname, 'preload.js');
     }
 
     public createMainWindow() {
@@ -37,7 +49,7 @@ export class WindowManager {
             minWidth: this.MIN_WIDTH,
             minHeight: this.MIN_HEIGHT,
             webPreferences: {
-                preload: path.join(__dirname, 'preload.js'),
+                preload: this.getPreloadPath(),
                 contextIsolation: true,
                 nodeIntegration: false
             }
@@ -46,7 +58,7 @@ export class WindowManager {
         if (this.VITE_DEV_SERVER_URL) {
             this.mainWindow.loadURL(this.VITE_DEV_SERVER_URL);
         } else {
-            this.mainWindow.loadFile(path.join(this.DIST, 'index.html'));
+            this.mainWindow.loadFile(path.join(this.getDistPath(), 'index.html'));
         }
 
         this.mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });

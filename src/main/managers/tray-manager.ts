@@ -10,7 +10,7 @@ export class TrayManager {
         try {
             // Robust path resolution for dev vs prod
             const assetPath = app.isPackaged
-                ? path.join(process.resourcesPath, 'assets')
+                ? path.join(process.resourcesPath, 'app.asar', 'assets')
                 : path.join(app.getAppPath(), 'assets');
 
             const trayIcon = path.join(assetPath, 'tray-icon.png');
