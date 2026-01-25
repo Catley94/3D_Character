@@ -45,8 +45,20 @@ function createWindow() {
 
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
-  // Only open devtools in explicit dev mode or if requested, to avoid blocking view
-  // mainWindow.webContents.openDevTools({ mode: 'detach' }); 
+  // Redirect renderer console to main terminal
+  mainWindow.webContents.on('console-message', (event, ...args: any[]) => {
+    // Electron 35+ sends (event, detailsObject)
+    // Older versions send (event, level, message, line, sourceId)
+
+    let message = '';
+    if (args.length === 1 && typeof args[0] === 'object') {
+      message = args[0].message;
+    } else if (args.length > 1) {
+      message = args[1]; // arg[0] is level, arg[1] is message
+    }
+
+    console.log(`[Renderer] ${message}`);
+  });
 }
 
 function createTray() {
@@ -205,6 +217,11 @@ app.whenReady().then(() => {
         height: h
       });
     }
+  });
+
+  ipcMain.on('set-ignore-mouse-events', (event, ignore, options) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    win?.setIgnoreMouseEvents(ignore, options);
   });
 
   app.on('activate', () => {

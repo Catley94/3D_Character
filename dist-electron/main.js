@@ -1001,6 +1001,15 @@ function createWindow() {
     mainWindow.loadFile(path.join(DIST, "index.html"));
   }
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  mainWindow.webContents.on("console-message", (event, ...args) => {
+    let message = "";
+    if (args.length === 1 && typeof args[0] === "object") {
+      message = args[0].message;
+    } else if (args.length > 1) {
+      message = args[1];
+    }
+    console.log(`[Renderer] ${message}`);
+  });
 }
 function createTray() {
   path.join(electron.app.getAppPath(), "assets/tray-icon.png");
@@ -1133,6 +1142,10 @@ electron.app.whenReady().then(() => {
         height: h
       });
     }
+  });
+  electron.ipcMain.on("set-ignore-mouse-events", (event, ignore, options) => {
+    const win = electron.BrowserWindow.fromWebContents(event.sender);
+    win?.setIgnoreMouseEvents(ignore, options);
   });
   electron.app.on("activate", () => {
     if (electron.BrowserWindow.getAllWindows().length === 0) {

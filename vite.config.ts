@@ -6,13 +6,12 @@ export default defineConfig({
     plugins: [
         electron([
             {
-                // Main-Process entry file of the Electron App.
                 entry: 'src/main/main.ts',
             },
             {
                 entry: 'src/main/preload.ts',
-                onstart(options) {
-                    options.reload()
+                onstart({ reload }) {
+                    reload()
                 },
             },
         ]),

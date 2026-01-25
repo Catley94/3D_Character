@@ -144,6 +144,8 @@ character.addEventListener('click', (e) => {
     // If already showing input or typing, don't react again
     if (!chatInputContainer.classList.contains('hidden') || isTyping || hasDragged) return;
 
+    console.log('Character clicked');
+
     handleCharacterClick();
 });
 
