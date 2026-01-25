@@ -1,0 +1,170 @@
+const { app, BrowserWindow, ipcMain, Tray, Menu, screen } = require('electron');
+const path = require('path');
+
+let mainWindow;
+let tray;
+let isDev = process.argv.includes('--dev');
+
+function createWindow() {
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+
+  mainWindow = new BrowserWindow({
+    width: 320,
+    height: 280,
+    x: width - 340,
+    y: height - 300,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    hasShadow: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+  mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
+  if (isDev) {
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  }
+}
+
+function createTray() {
+  // Use a simple tray icon (we'll create this later)
+  const iconPath = path.join(__dirname, '../../assets/tray-icon.png');
+
+  try {
+    tray = new Tray(iconPath);
+  } catch (e) {
+    // Fallback: create tray without icon if not found
+    console.log('Tray icon not found, using default');
+    return;
+  }
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Show Character',
+      click: () => mainWindow.show()
+    },
+    {
+      label: 'Settings',
+      click: () => mainWindow.webContents.send('open-settings')
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit',
+      click: () => app.quit()
+    }
+  ]);
+
+  tray.setToolTip('AI Character Assistant');
+  tray.setContextMenu(contextMenu);
+}
+
+// IPC Handlers for AI communication
+ipcMain.handle('send-message', async (event, { message, config }) => {
+  try {
+    const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+    if (!config.apiKey) {
+      return { error: 'Please set your API key in settings!' };
+    }
+
+    const genAI = new GoogleGenerativeAI(config.apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+    const systemPrompt = buildSystemPrompt(config.personality, config.characterName);
+
+    const result = await model.generateContent([
+      { text: systemPrompt },
+      { text: message }
+    ]);
+
+    return { response: result.response.text() };
+  } catch (error) {
+    console.error('AI Error:', error);
+    return { error: error.message };
+  }
+});
+
+function buildSystemPrompt(personality, characterName) {
+  const traits = personality || ['helpful', 'quirky', 'playful'];
+  return `You are ${characterName || 'Foxy'}, a cute and adorable AI companion that lives on the user's desktop.
+Your personality traits are: ${traits.join(', ')}.
+Keep responses SHORT (1-3 sentences max) since they appear in a small speech bubble.
+Be expressive and use occasional emojis to convey emotion.
+You were just poked/clicked by the user, so you might react to that playfully.`;
+}
+
+// Save and load config
+ipcMain.handle('save-config', async (event, config) => {
+  const fs = require('fs');
+  const configPath = path.join(app.getPath('userData'), 'config.json');
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+  return { success: true };
+});
+
+ipcMain.handle('load-config', async () => {
+  const fs = require('fs');
+  const configPath = path.join(app.getPath('userData'), 'config.json');
+  try {
+    const data = fs.readFileSync(configPath, 'utf8');
+    return JSON.parse(data);
+  } catch (e) {
+    return {
+      provider: 'gemini',
+      apiKey: '',
+      theme: 'fox',
+      characterName: 'Foxy',
+      personality: ['helpful', 'quirky', 'playful']
+    };
+  }
+});
+
+app.whenReady().then(() => {
+  createWindow();
+  createTray();
+
+  // Handle window dragging - Using absolute position approach
+  // WORKAROUND: On Linux with transparent windows, normal setPosition causes issues
+  const FIXED_WIDTH = 320;
+  const FIXED_HEIGHT = 280;
+
+  // Get current window bounds (for calculating initial position on drag start)
+  ipcMain.handle('get-window-bounds', () => {
+    if (mainWindow) {
+      return mainWindow.getBounds();
+    }
+    return { x: 0, y: 0, width: FIXED_WIDTH, height: FIXED_HEIGHT };
+  });
+
+  // Set window to absolute position (maintaining fixed size)
+  ipcMain.on('set-window-position', (event, { x, y }) => {
+    if (mainWindow) {
+      mainWindow.setBounds({
+        x: Math.round(x),
+        y: Math.round(y),
+        width: FIXED_WIDTH,
+        height: FIXED_HEIGHT
+      });
+    }
+  });
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
