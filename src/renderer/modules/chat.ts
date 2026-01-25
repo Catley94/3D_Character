@@ -4,6 +4,7 @@ import { setState } from './character';
 // DOM Elements
 const speechBubble = document.getElementById('speech-bubble') as HTMLDivElement;
 const bubbleText = document.getElementById('bubble-text') as HTMLParagraphElement;
+const bubbleDismiss = document.getElementById('bubble-dismiss') as HTMLButtonElement;
 const chatInputContainer = document.getElementById('chat-input-container') as HTMLDivElement;
 const chatInput = document.getElementById('chat-input') as HTMLInputElement;
 const sendBtn = document.getElementById('send-btn') as HTMLButtonElement;
@@ -14,14 +15,23 @@ const INPUT_HEIGHT = 60;       // Chat input container height
 const EXTRA_PADDING = 30;      // Extra padding for spacing
 const MIN_WIDTH = 200;
 const CONTENT_WIDTH = 320;     // Width when content is shown
-const IDLE_TIMEOUT_MS = 15000;
+
+// Timeout constants
+const TYPING_TIMEOUT_MS = 15000;    // Short timeout while typing (15s)
+const RESPONSE_TIMEOUT_MS = 60000;  // Long timeout after AI response (60s)
 
 let idleTimeout: NodeJS.Timeout | null = null;
+let bubbleTimeout: NodeJS.Timeout | null = null;
 
 export function initChat() {
     sendBtn.addEventListener('click', sendMessage);
     chatInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') sendMessage();
+    });
+
+    // Dismiss button handler
+    bubbleDismiss.addEventListener('click', () => {
+        dismissBubble();
     });
 
     // Reset idle timeout while typing
@@ -30,7 +40,7 @@ export function initChat() {
             clearIdleTimeout();
             idleTimeout = setTimeout(() => {
                 returnToIdle("Still there? I'm going to nap! 😴");
-            }, IDLE_TIMEOUT_MS);
+            }, TYPING_TIMEOUT_MS);
         }
     });
 }
@@ -134,7 +144,7 @@ export function showChatInput() {
     clearIdleTimeout();
     idleTimeout = setTimeout(() => {
         returnToIdle("Taking a quick nap... poke me anytime! 😴");
-    }, IDLE_TIMEOUT_MS);
+    }, TYPING_TIMEOUT_MS);
 }
 
 export function hideChatInput() {
@@ -151,14 +161,43 @@ function clearIdleTimeout() {
     }
 }
 
+function clearBubbleTimeout() {
+    if (bubbleTimeout) {
+        clearTimeout(bubbleTimeout);
+        bubbleTimeout = null;
+    }
+}
+
+function dismissBubble() {
+    clearBubbleTimeout();
+    hideSpeechBubble();
+    // If we're just showing the bubble (idle state), shrink window
+    if (chatInputContainer.classList.contains('hidden')) {
+        updateWindowSize();
+    }
+}
+
 function returnToIdle(message: string | null) {
     hideChatInput();
     hideSpeechBubble();
+    clearBubbleTimeout();
     if (message) {
         showSpeechBubble(message);
-        setTimeout(hideSpeechBubble, 3000);
+        // Short timeout for system messages
+        bubbleTimeout = setTimeout(hideSpeechBubble, 3000);
     }
     setState(CharacterState.IDLE);
+}
+
+// After AI response: Foxy goes idle, but bubble stays with dismiss option
+function goIdleKeepBubble() {
+    setState(CharacterState.IDLE);
+    clearBubbleTimeout();
+    // Set a long timeout for the bubble to auto-dismiss
+    bubbleTimeout = setTimeout(() => {
+        hideSpeechBubble();
+        hideChatInput();
+    }, RESPONSE_TIMEOUT_MS);
 }
 
 async function sendMessage() {
@@ -191,11 +230,10 @@ async function sendMessage() {
 
         chatInput.disabled = false;
         chatInput.focus();
-        setState(CharacterState.LISTENING);
 
-        idleTimeout = setTimeout(() => {
-            returnToIdle("I'll just take a nap then! 😴");
-        }, IDLE_TIMEOUT_MS);
+        // Foxy goes idle but bubble stays visible for reading
+        // User can dismiss with X button or it auto-hides after 60s
+        goIdleKeepBubble();
 
     } catch (error) {
         console.error('Error sending message:', error);
