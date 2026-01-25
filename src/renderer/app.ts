@@ -1,41 +1,44 @@
+/// <reference path="../vite-env.d.ts" />
+
 // ===== State Management =====
 const CharacterState = {
     IDLE: 'idle',
     CLICKED: 'clicked',
     LISTENING: 'listening',
     TALKING: 'talking'
-};
+} as const;
 
-let currentState = CharacterState.IDLE;
-let config = {};
-let conversationHistory = [];
-let idleTimeout = null;
+type CharacterStateValue = typeof CharacterState[keyof typeof CharacterState];
+
+let currentState: CharacterStateValue = CharacterState.IDLE;
+let config: any = {};
+let idleTimeout: NodeJS.Timeout | null = null;
 const IDLE_TIMEOUT_MS = 15000; // Return to idle after 15 seconds of no input
 let isTyping = false;
 let hasDragged = false;
 
 // ===== DOM Elements =====
-const character = document.getElementById('character');
-const characterImg = document.getElementById('character-img');
-const speechBubble = document.getElementById('speech-bubble');
-const bubbleText = document.getElementById('bubble-text');
-const chatInputContainer = document.getElementById('chat-input-container');
-const chatInput = document.getElementById('chat-input');
-const sendBtn = document.getElementById('send-btn');
-const backpack = document.getElementById('backpack');
-const settingsPanel = document.getElementById('settings-panel');
+const character = document.getElementById('character') as HTMLDivElement;
+const characterImg = document.getElementById('character-img') as HTMLImageElement;
+const speechBubble = document.getElementById('speech-bubble') as HTMLDivElement;
+const bubbleText = document.getElementById('bubble-text') as HTMLParagraphElement;
+const chatInputContainer = document.getElementById('chat-input-container') as HTMLDivElement;
+const chatInput = document.getElementById('chat-input') as HTMLInputElement;
+const sendBtn = document.getElementById('send-btn') as HTMLButtonElement;
+const backpack = document.getElementById('backpack') as HTMLDivElement;
+const settingsPanel = document.getElementById('settings-panel') as HTMLDivElement;
 
 // Settings form elements
-const apiProvider = document.getElementById('api-provider');
-const apiKey = document.getElementById('api-key');
-const geminiModel = document.getElementById('gemini-model');
-const customModelInput = document.getElementById('custom-model-input');
-const characterName = document.getElementById('character-name');
-const themeSelect = document.getElementById('theme-select');
-const personalityCheckboxes = document.querySelectorAll('#personality-traits input');
-const saveSettingsBtn = document.getElementById('save-settings');
-const closeSettingsBtn = document.getElementById('close-settings');
-const debugModeCheckbox = document.getElementById('debug-mode');
+const apiProvider = document.getElementById('api-provider') as HTMLSelectElement;
+const apiKey = document.getElementById('api-key') as HTMLInputElement;
+const geminiModel = document.getElementById('gemini-model') as HTMLSelectElement;
+const customModelInput = document.getElementById('custom-model-input') as HTMLInputElement;
+const characterName = document.getElementById('character-name') as HTMLInputElement;
+const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
+const personalityCheckboxes = document.querySelectorAll('#personality-traits input') as NodeListOf<HTMLInputElement>;
+const saveSettingsBtn = document.getElementById('save-settings') as HTMLButtonElement;
+const closeSettingsBtn = document.getElementById('close-settings') as HTMLButtonElement;
+const debugModeCheckbox = document.getElementById('debug-mode') as HTMLInputElement;
 
 // ===== Initialization =====
 async function init() {
@@ -49,7 +52,7 @@ async function init() {
     // setupClickThrough();
 }
 
-function applyConfig(cfg) {
+function applyConfig(cfg: any) {
     apiProvider.value = cfg.provider || 'gemini';
     apiKey.value = cfg.apiKey || '';
 
@@ -92,19 +95,19 @@ geminiModel.addEventListener('change', () => {
     }
 });
 
-function updateCharacterTheme(theme) {
-    const basePath = `../../assets/themes/${theme}`;
+function updateCharacterTheme(theme: string) {
+    const basePath = `assets/themes/${theme}`;
     characterImg.src = `${basePath}/idle.png`;
 }
 
 // ===== State Machine =====
-function setState(newState) {
+function setState(newState: CharacterStateValue) {
     currentState = newState;
     character.className = `state-${newState}`;
 
     // Update character image based on state and theme
     const theme = config.theme || 'fox';
-    const basePath = `../../assets/themes/${theme}`;
+    const basePath = `assets/themes/${theme}`;
 
     switch (newState) {
         case CharacterState.CLICKED:
@@ -136,7 +139,7 @@ function getRandomReaction() {
 
 character.addEventListener('click', (e) => {
     // Ignore clicks on backpack
-    if (e.target === backpack || backpack.contains(e.target)) return;
+    if (e.target === backpack || backpack.contains(e.target as Node)) return;
 
     // If already showing input or typing, don't react again
     if (!chatInputContainer.classList.contains('hidden') || isTyping || hasDragged) return;
@@ -174,7 +177,7 @@ function updateWindowHeight() {
     }
 }
 
-function showSpeechBubble(text, animate = true) {
+function showSpeechBubble(text: string, animate = true) {
     speechBubble.classList.remove('hidden');
 
     if (animate) {
@@ -192,7 +195,7 @@ function hideSpeechBubble() {
     window.electronAPI.setWindowSize(350, BASE_HEIGHT);
 }
 
-async function typeText(text) {
+async function typeText(text: string) {
     if (isTyping) return;
     isTyping = true;
 
@@ -228,7 +231,7 @@ async function typeText(text) {
     }
 }
 
-function sleep(ms) {
+function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
@@ -257,7 +260,7 @@ function clearIdleTimeout() {
     }
 }
 
-function returnToIdle(message) {
+function returnToIdle(message: string | null) {
     hideChatInput();
     hideSpeechBubble();
     if (message) {
@@ -335,14 +338,14 @@ chatInput.addEventListener('input', () => {
 
 // ===== Window Dragging =====
 let isDragging = false;
-let dragStartMouseX, dragStartMouseY;
-let dragStartWinX, dragStartWinY;
-let dragStartWidth, dragStartHeight;
+let dragStartMouseX: number, dragStartMouseY: number;
+let dragStartWinX: number, dragStartWinY: number;
+let dragStartWidth: number, dragStartHeight: number;
 
 // Start drag from character
-async function startDrag(e) {
+async function startDrag(e: MouseEvent) {
     // Don't start drag if clicking on backpack/settings button
-    if (e.target === backpack || backpack.contains(e.target)) return;
+    if (e.target === backpack || backpack.contains(e.target as Node)) return;
 
     isDragging = true;
     hasDragged = false;
@@ -398,7 +401,7 @@ closeSettingsBtn.addEventListener('click', closeSettings);
 
 saveSettingsBtn.addEventListener('click', async () => {
     // Gather settings
-    const selectedPersonality = [];
+    const selectedPersonality: string[] = [];
     personalityCheckboxes.forEach(cb => {
         if (cb.checked) selectedPersonality.push(cb.value);
     });

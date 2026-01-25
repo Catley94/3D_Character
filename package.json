@@ -2,10 +2,11 @@
   "name": "ai-character-assistant",
   "version": "1.0.0",
   "description": "A cute AI companion that floats on your desktop",
-  "main": "src/main/main.js",
+  "main": "dist-electron/main.js",
   "scripts": {
-    "start": "electron . --no-sandbox",
-    "dev": "electron . --dev --no-sandbox"
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
   },
   "keywords": [
     "ai",
@@ -17,7 +18,12 @@
   "author": "Sam",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^28.0.0"
+    "@types/node": "^25.0.10",
+    "electron": "^28.3.3",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "vite-plugin-electron": "^0.29.0",
+    "vite-plugin-electron-renderer": "^0.14.6"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0"

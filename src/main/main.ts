@@ -1,14 +1,22 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, screen } = require('electron');
-const path = require('path');
+import { app, BrowserWindow, ipcMain, Tray, Menu, screen, IpcMainInvokeEvent } from 'electron';
+import path from 'path';
+import fs from 'fs';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-let mainWindow;
-let tray;
-let isDev = process.argv.includes('--dev');
+let mainWindow: BrowserWindow | null;
+let tray: Tray;
+let isDev = process.env.NODE_ENV === 'development';
 const FIXED_WIDTH = 350;
 const FIXED_HEIGHT = 450;
+const DIST = path.join(__dirname, '../dist');
+const PUBLIC = app.isPackaged ? DIST : path.join(DIST, '../public');
+
+// Vite Dev Server URL
+const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 
 function createWindow() {
-  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.workAreaSize;
 
   mainWindow = new BrowserWindow({
     width: FIXED_WIDTH,
@@ -29,34 +37,57 @@ function createWindow() {
     }
   });
 
-  mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+  if (VITE_DEV_SERVER_URL) {
+    mainWindow.loadURL(VITE_DEV_SERVER_URL);
+  } else {
+    mainWindow.loadFile(path.join(DIST, 'index.html'));
+  }
+
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
-  if (isDev) {
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
-  }
+  // Only open devtools in explicit dev mode or if requested, to avoid blocking view
+  // mainWindow.webContents.openDevTools({ mode: 'detach' }); 
 }
 
 function createTray() {
-  // Use a simple tray icon (we'll create this later)
-  const iconPath = path.join(__dirname, '../../assets/tray-icon.png');
+  const iconPath = path.join(app.getAppPath(), 'assets/tray-icon.png');
+  // Check if icon exists, otherwise handle it (electron might crash if tray icon is missing)
+  // In dev, assets are in root. In prod, they are copied.
+  // We'll trust the path for now or use a try-catch blocks like the original code.
+
+  // NOTE: In production, assets might need to be in resources or handled differently.
+  // For now we assume they are accessible from app path.
 
   try {
-    tray = new Tray(iconPath);
+    // Adjust path based on environment if necessary. 
+    // The original code used `../../assets/tray-icon.png` relative to `src/main/main.js`.
+    // New `main.ts` is in `src/main`. `../../assets` is `root/assets`.
+    // `app.getAppPath()` usually points to built resource.
+    // Let's stick to a robust path resolution.
+    const assetPath = app.isPackaged ? path.join(process.resourcesPath, 'assets') : path.join(app.getAppPath(), 'assets');
+    const trayIcon = path.join(assetPath, 'tray-icon.png');
+
+    if (fs.existsSync(trayIcon)) {
+      tray = new Tray(trayIcon);
+    } else {
+      console.log('Tray icon not found at:', trayIcon);
+      // Create empty tray or handle error
+      return;
+    }
+
   } catch (e) {
-    // Fallback: create tray without icon if not found
-    console.log('Tray icon not found, using default');
+    console.log('Tray icon creation failed', e);
     return;
   }
 
   const contextMenu = Menu.buildFromTemplate([
     {
       label: 'Show Character',
-      click: () => mainWindow.show()
+      click: () => mainWindow?.show()
     },
     {
       label: 'Settings',
-      click: () => mainWindow.webContents.send('open-settings')
+      click: () => mainWindow?.webContents.send('open-settings')
     },
     { type: 'separator' },
     {
@@ -69,18 +100,16 @@ function createTray() {
   tray.setContextMenu(contextMenu);
 }
 
-// IPC Handlers for AI communication
-ipcMain.handle('send-message', async (event, { message, config }) => {
-  const fs = require('fs');
-  const logPath = path.join(__dirname, '../../conversation_log.txt');
-
-  // Log the user message
+// IPC Handlers
+ipcMain.handle('send-message', async (event: IpcMainInvokeEvent, { message, config }: { message: string, config: any }) => {
+  const logPath = path.join(app.getPath('userData'), 'conversation_log.txt');
   const timestamp = new Date().toISOString();
-  fs.appendFileSync(logPath, `\n[${timestamp}] USER: ${message}\n`);
 
   try {
-    const { GoogleGenerativeAI } = require('@google/generative-ai');
+    fs.appendFileSync(logPath, `\n[${timestamp}] USER: ${message}\n`);
+  } catch (e) { console.error("Error writing log", e) }
 
+  try {
     if (!config.apiKey) {
       const errorMsg = 'Please set your API key in settings!';
       fs.appendFileSync(logPath, `[${timestamp}] ERROR: ${errorMsg}\n`);
@@ -104,14 +133,16 @@ ipcMain.handle('send-message', async (event, { message, config }) => {
     fs.appendFileSync(logPath, `[${timestamp}] AI RESPONSE: ${responseText}\n`);
 
     return { response: responseText };
-  } catch (error) {
+  } catch (error: any) {
     console.error('AI Error:', error);
-    fs.appendFileSync(logPath, `[${timestamp}] AI ERROR: ${error.message}\n[${timestamp}] FULL ERROR: ${JSON.stringify(error, null, 2)}\n`);
+    try {
+      fs.appendFileSync(logPath, `[${timestamp}] AI ERROR: ${error.message}\n[${timestamp}] FULL ERROR: ${JSON.stringify(error, null, 2)}\n`);
+    } catch (e) { }
     return { error: error.message };
   }
 });
 
-function buildSystemPrompt(personality, characterName) {
+function buildSystemPrompt(personality: string[], characterName: string) {
   const traits = personality || ['helpful', 'quirky', 'playful'];
   return `You are ${characterName || 'Foxy'}, a cute and adorable AI companion that lives on the user's desktop.
 Your personality traits are: ${traits.join(', ')}.
@@ -121,15 +152,13 @@ You were just poked/clicked by the user, so you might react to that playfully.`;
 }
 
 // Save and load config
-ipcMain.handle('save-config', async (event, config) => {
-  const fs = require('fs');
+ipcMain.handle('save-config', async (event: IpcMainInvokeEvent, config: any) => {
   const configPath = path.join(app.getPath('userData'), 'config.json');
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
   return { success: true };
 });
 
 ipcMain.handle('load-config', async () => {
-  const fs = require('fs');
   const configPath = path.join(app.getPath('userData'), 'config.json');
   try {
     const data = fs.readFileSync(configPath, 'utf8');
@@ -147,14 +176,9 @@ ipcMain.handle('load-config', async () => {
 
 app.whenReady().then(() => {
   createWindow();
-  createTray();
+  // createTray(); // Delay tray creation or handle it carefully
+  setTimeout(createTray, 500);
 
-  // Handle window dragging - Using absolute position approach
-  // WORKAROUND: On Linux with transparent windows, normal setPosition causes issues
-
-
-
-  // Get current window bounds (for calculating initial position on drag start)
   ipcMain.handle('get-window-bounds', () => {
     if (mainWindow) {
       return mainWindow.getBounds();
@@ -162,17 +186,14 @@ app.whenReady().then(() => {
     return { x: 0, y: 0, width: FIXED_WIDTH, height: FIXED_HEIGHT };
   });
 
-  // Set window size dynamically based on content
   ipcMain.on('set-window-size', (event, { width, height }) => {
     if (mainWindow) {
       mainWindow.setSize(width || FIXED_WIDTH, height || FIXED_HEIGHT);
     }
   });
 
-  // Set window to absolute position (maintaining CURRENT size OR explicit size)
   ipcMain.on('set-window-position', (event, { x, y, width, height }) => {
     if (mainWindow) {
-      // Use passed dimensions if available (prevent growth bug), else current bounds
       const currentBounds = mainWindow.getBounds();
       const w = width || currentBounds.width;
       const h = height || currentBounds.height;
