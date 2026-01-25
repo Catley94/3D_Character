@@ -1,4 +1,4 @@
-import { ipcMain, IpcMainInvokeEvent, BrowserWindow } from 'electron';
+import { ipcMain, IpcMainInvokeEvent, BrowserWindow, screen } from 'electron';
 import { geminiService } from './services/gemini';
 import { configService } from './services/config-store';
 import { windowManager } from './managers/window-manager';
@@ -25,6 +25,10 @@ export function registerIpcHandlers() {
             return win.getBounds();
         }
         return { x: 0, y: 0, width: 350, height: 450 }; // Fallback defaults
+    });
+
+    ipcMain.handle('get-cursor-screen-point', () => {
+        return screen.getCursorScreenPoint();
     });
 
     ipcMain.on('set-window-size', (event, { width, height }) => {

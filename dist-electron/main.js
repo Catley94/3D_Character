@@ -1169,6 +1169,9 @@ function registerIpcHandlers() {
     }
     return { x: 0, y: 0, width: 350, height: 450 };
   });
+  electron.ipcMain.handle("get-cursor-screen-point", () => {
+    return electron.screen.getCursorScreenPoint();
+  });
   electron.ipcMain.on("set-window-size", (event, { width, height }) => {
     const win = windowManager.getMainWindow();
     if (win) {

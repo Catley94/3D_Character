@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // Click-through control
     setIgnoreMouseEvents: (ignore: boolean, options?: any) => ipcRenderer.send('set-ignore-mouse-events', ignore, options),
+    getCursorScreenPoint: () => ipcRenderer.invoke('get-cursor-screen-point'),
 
     // AI communication
     sendMessage: (message: string, config: any) => ipcRenderer.invoke('send-message', { message, config }),

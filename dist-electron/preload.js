@@ -8,6 +8,7 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
   setWindowSize: (width, height) => electron.ipcRenderer.send("set-window-size", { width, height }),
   // Click-through control
   setIgnoreMouseEvents: (ignore, options) => electron.ipcRenderer.send("set-ignore-mouse-events", ignore, options),
+  getCursorScreenPoint: () => electron.ipcRenderer.invoke("get-cursor-screen-point"),
   // AI communication
   sendMessage: (message, config) => electron.ipcRenderer.invoke("send-message", { message, config }),
   // Settings

@@ -16,7 +16,25 @@ A cute, interactive AI companion that lives on your desktop. Foxy (or your custo
     ```bash
     npm install
     ```
-2.  **Run Development Mode**:
+## 🐧 Linux / Wayland Compatibility Note
+
+To achieve the "Click-Through" transparency effect on Linux (specifically Wayland and some X11 compositors), this app uses a specific **Polling Strategy** ("The Radar").
+
+### The Problem
+Standard Electron `setIgnoreMouseEvents(true, { forward: true })` is unreliable on Linux.
+- The browser often thinks the mouse "Left the Window" immediately when transparency is enabled.
+- Mouse events stop firing, making it impossible to "wake up" the window when the user hovers back over the character.
+
+### The Solution: "Radar" Polling
+We implement a manual mouse tracker in `interactions.ts` that:
+1.  Polls the Global Cursor Position via IPC (`getCursorScreenPoint`) every 100ms.
+2.  Polls the Window Bounds via IPC.
+3.  Calculates if the mouse is visually inside the Character's bounding box.
+4.  Manually toggles `setIgnoreMouseEvents(false)` (Capture) or `true` (Pass-Through).
+
+**Note:** This polling is lightweight but essential for Linux functionality.
+
+## 🛠️ Development Mode**:
     ```bash
     npm run dev
     ```
