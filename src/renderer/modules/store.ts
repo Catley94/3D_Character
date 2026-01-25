@@ -13,6 +13,7 @@ export interface AppState {
     isTyping: boolean;
     hasDragged: boolean;
     isDragging: boolean;
+    isWindowLocked: boolean;
 }
 
 export const state: AppState = {
@@ -20,7 +21,8 @@ export const state: AppState = {
     config: {},
     isTyping: false,
     hasDragged: false,
-    isDragging: false
+    isDragging: false,
+    isWindowLocked: false
 };
 
 // Event emitter for state changes (simple version)

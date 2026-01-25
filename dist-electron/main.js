@@ -4,8 +4,8 @@ const path = require("path");
 const fs = require("fs");
 class WindowManager {
   mainWindow = null;
-  FIXED_WIDTH = 350;
-  FIXED_HEIGHT = 450;
+  MIN_WIDTH = 200;
+  MIN_HEIGHT = 200;
   DIST;
   VITE_DEV_SERVER_URL;
   constructor() {
@@ -20,17 +20,20 @@ class WindowManager {
     const primaryDisplay = electron.screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.workAreaSize;
     this.mainWindow = new electron.BrowserWindow({
-      width: this.FIXED_WIDTH,
-      height: this.FIXED_HEIGHT,
-      x: width - 340,
-      y: height - 300,
+      width: this.MIN_WIDTH,
+      height: this.MIN_HEIGHT,
+      x: width - this.MIN_WIDTH - 20,
+      y: height - this.MIN_HEIGHT - 20,
       frame: false,
       transparent: true,
       backgroundColor: "#00000000",
       alwaysOnTop: true,
       skipTaskbar: true,
-      resizable: false,
+      resizable: true,
+      // Allow dynamic resizing
       hasShadow: false,
+      minWidth: this.MIN_WIDTH,
+      minHeight: this.MIN_HEIGHT,
       webPreferences: {
         preload: path.join(__dirname, "preload.js"),
         contextIsolation: true,
@@ -1175,7 +1178,13 @@ function registerIpcHandlers() {
   electron.ipcMain.on("set-window-size", (event, { width, height }) => {
     const win = windowManager.getMainWindow();
     if (win) {
-      win.setSize(width || 350, height || 450);
+      win.setSize(width || 200, height || 200);
+    }
+  });
+  electron.ipcMain.on("set-window-locked", (event, locked) => {
+    const win = windowManager.getMainWindow();
+    if (win) {
+      win.setMovable(!locked);
     }
   });
   electron.ipcMain.on("set-window-position", (event, { x, y, width, height }) => {

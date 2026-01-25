@@ -3,8 +3,8 @@ import path from 'path';
 
 export class WindowManager {
     private mainWindow: BrowserWindow | null = null;
-    private readonly FIXED_WIDTH = 350;
-    private readonly FIXED_HEIGHT = 450;
+    private readonly MIN_WIDTH = 200;
+    private readonly MIN_HEIGHT = 200;
     private readonly DIST: string;
     private readonly VITE_DEV_SERVER_URL: string | undefined;
 
@@ -23,17 +23,19 @@ export class WindowManager {
         const { width, height } = primaryDisplay.workAreaSize;
 
         this.mainWindow = new BrowserWindow({
-            width: this.FIXED_WIDTH,
-            height: this.FIXED_HEIGHT,
-            x: width - 340,
-            y: height - 300,
+            width: this.MIN_WIDTH,
+            height: this.MIN_HEIGHT,
+            x: width - this.MIN_WIDTH - 20,
+            y: height - this.MIN_HEIGHT - 20,
             frame: false,
             transparent: true,
             backgroundColor: '#00000000',
             alwaysOnTop: true,
             skipTaskbar: true,
-            resizable: false,
+            resizable: true,  // Allow dynamic resizing
             hasShadow: false,
+            minWidth: this.MIN_WIDTH,
+            minHeight: this.MIN_HEIGHT,
             webPreferences: {
                 preload: path.join(__dirname, 'preload.js'),
                 contextIsolation: true,

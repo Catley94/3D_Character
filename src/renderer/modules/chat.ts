@@ -8,9 +8,12 @@ const chatInputContainer = document.getElementById('chat-input-container') as HT
 const chatInput = document.getElementById('chat-input') as HTMLInputElement;
 const sendBtn = document.getElementById('send-btn') as HTMLButtonElement;
 
-// Constants
-const BASE_HEIGHT = 450;
-const EXTRA_PADDING = 50;
+// Constants - Dynamic sizing
+const CHARACTER_HEIGHT = 180;  // Character image + padding
+const INPUT_HEIGHT = 60;       // Chat input container height
+const EXTRA_PADDING = 30;      // Extra padding for spacing
+const MIN_WIDTH = 200;
+const CONTENT_WIDTH = 320;     // Width when content is shown
 const IDLE_TIMEOUT_MS = 15000;
 
 let idleTimeout: NodeJS.Timeout | null = null;
@@ -41,24 +44,54 @@ export function showSpeechBubble(text: string, animate = true) {
         typeText(text);
     } else {
         bubbleText.textContent = text;
-        setTimeout(updateWindowHeight, 50);
+        setTimeout(updateWindowSize, 50);
     }
 }
 
 export function hideSpeechBubble() {
     speechBubble.classList.add('hidden');
     bubbleText.textContent = '';
-    window.electronAPI.setWindowSize(350, BASE_HEIGHT);
+    updateWindowSize();
 }
 
-function updateWindowHeight() {
-    const bubbleHeight = speechBubble.offsetHeight;
-    if (!speechBubble.classList.contains('hidden') && bubbleHeight > 100) {
-        const newHeight = 350 + bubbleHeight + EXTRA_PADDING;
-        window.electronAPI.setWindowSize(350, Math.max(BASE_HEIGHT, newHeight));
-    } else {
-        window.electronAPI.setWindowSize(350, BASE_HEIGHT);
+// ===== Window Sizing Helpers =====
+
+function lockWindow() {
+    state.isWindowLocked = true;
+    window.electronAPI.setWindowLocked(true);
+    document.body.classList.add('window-locked');
+}
+
+function unlockWindow() {
+    state.isWindowLocked = false;
+    window.electronAPI.setWindowLocked(false);
+    document.body.classList.remove('window-locked');
+}
+
+function calculateWindowHeight(): number {
+    let height = CHARACTER_HEIGHT;
+
+    // Add speech bubble height if visible
+    if (!speechBubble.classList.contains('hidden')) {
+        height += speechBubble.offsetHeight + 10;
     }
+
+    // Add input height if visible
+    if (!chatInputContainer.classList.contains('hidden')) {
+        height += INPUT_HEIGHT;
+    }
+
+    return height + EXTRA_PADDING;
+}
+
+function updateWindowSize() {
+    const hasContent = !speechBubble.classList.contains('hidden') ||
+        !chatInputContainer.classList.contains('hidden');
+
+    const width = hasContent ? CONTENT_WIDTH : MIN_WIDTH;
+    const height = calculateWindowHeight();
+
+    window.electronAPI.setWindowSize(width, height);
 }
 
 async function typeText(text: string) {
@@ -76,12 +109,12 @@ async function typeText(text: string) {
             bubbleText.textContent = text.substring(0, i + 1);
             bubbleText.appendChild(cursor);
 
-            if (i % 10 === 0) updateWindowHeight();
+            if (i % 10 === 0) updateWindowSize();
 
             await new Promise(r => setTimeout(r, 30 + Math.random() * 20));
         }
 
-        updateWindowHeight();
+        updateWindowSize();
         setTimeout(() => cursor.remove(), 1000);
 
     } catch (e) {
@@ -97,6 +130,7 @@ async function typeText(text: string) {
 export function showChatInput() {
     chatInputContainer.classList.remove('hidden');
     chatInput.focus();
+    updateWindowSize();
     clearIdleTimeout();
     idleTimeout = setTimeout(() => {
         returnToIdle("Taking a quick nap... poke me anytime! 😴");
@@ -107,6 +141,7 @@ export function hideChatInput() {
     chatInputContainer.classList.add('hidden');
     chatInput.value = '';
     clearIdleTimeout();
+    updateWindowSize();
 }
 
 function clearIdleTimeout() {
@@ -134,6 +169,9 @@ async function sendMessage() {
     chatInput.disabled = true;
     clearIdleTimeout();
 
+    // Lock window during AI response generation
+    lockWindow();
+
     setState(CharacterState.LISTENING);
     showSpeechBubble('Hmm, let me think... 🤔', false);
 
@@ -148,6 +186,9 @@ async function sendMessage() {
             await showSpeechBubble(result.response);
         }
 
+        // Unlock window after response is fully displayed
+        unlockWindow();
+
         chatInput.disabled = false;
         chatInput.focus();
         setState(CharacterState.LISTENING);
@@ -160,6 +201,9 @@ async function sendMessage() {
         console.error('Error sending message:', error);
         setState(CharacterState.TALKING);
         showSpeechBubble("Something went wrong! 😵");
+
+        // Unlock window on error too
+        unlockWindow();
 
         setTimeout(() => {
             chatInput.disabled = false;

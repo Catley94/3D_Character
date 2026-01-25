@@ -34,7 +34,15 @@ export function registerIpcHandlers() {
     ipcMain.on('set-window-size', (event, { width, height }) => {
         const win = windowManager.getMainWindow();
         if (win) {
-            win.setSize(width || 350, height || 450);
+            win.setSize(width || 200, height || 200);
+        }
+    });
+
+    ipcMain.on('set-window-locked', (event, locked: boolean) => {
+        const win = windowManager.getMainWindow();
+        if (win) {
+            // When locked, we disable moving but keep window interactive
+            win.setMovable(!locked);
         }
     });
 

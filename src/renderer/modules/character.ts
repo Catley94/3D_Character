@@ -94,6 +94,9 @@ async function startDrag(e: MouseEvent) {
     // Don't start drag if clicking on backpack
     if (e.target === backpack || backpack.contains(e.target as Node)) return;
 
+    // Don't allow dragging when window is locked (during AI response)
+    if (state.isWindowLocked) return;
+
     state.isDragging = true;
     state.hasDragged = false;
     dragStartMouseX = e.screenX;
