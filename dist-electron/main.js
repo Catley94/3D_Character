@@ -2,6 +2,110 @@
 const electron = require("electron");
 const path = require("path");
 const fs = require("fs");
+class WindowManager {
+  mainWindow = null;
+  FIXED_WIDTH = 350;
+  FIXED_HEIGHT = 450;
+  DIST;
+  VITE_DEV_SERVER_URL;
+  constructor() {
+    this.DIST = path.join(__dirname, "../../dist");
+    this.VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
+  }
+  createMainWindow() {
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      this.mainWindow.show();
+      return;
+    }
+    const primaryDisplay = electron.screen.getPrimaryDisplay();
+    const { width, height } = primaryDisplay.workAreaSize;
+    this.mainWindow = new electron.BrowserWindow({
+      width: this.FIXED_WIDTH,
+      height: this.FIXED_HEIGHT,
+      x: width - 340,
+      y: height - 300,
+      frame: false,
+      transparent: true,
+      backgroundColor: "#00000000",
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      resizable: false,
+      hasShadow: false,
+      webPreferences: {
+        preload: path.join(__dirname, "preload.js"),
+        contextIsolation: true,
+        nodeIntegration: false
+      }
+    });
+    if (this.VITE_DEV_SERVER_URL) {
+      this.mainWindow.loadURL(this.VITE_DEV_SERVER_URL);
+    } else {
+      this.mainWindow.loadFile(path.join(this.DIST, "index.html"));
+    }
+    this.mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    this.setupEventListeners();
+  }
+  getMainWindow() {
+    return this.mainWindow;
+  }
+  show() {
+    this.mainWindow?.show();
+  }
+  openSettings() {
+    this.mainWindow?.webContents.send("open-settings");
+  }
+  setupEventListeners() {
+    if (!this.mainWindow) return;
+    this.mainWindow.webContents.on("did-finish-load", () => {
+      console.log("[Main] Page finished loading");
+    });
+    this.mainWindow.webContents.on("console-message", (event, ...args) => {
+      let message = "";
+      if (args.length === 1 && typeof args[0] === "object") {
+        message = args[0].message;
+      } else if (args.length > 1) {
+        message = args[1];
+      }
+      console.log(`[Renderer] ${message}`);
+    });
+  }
+}
+const windowManager = new WindowManager();
+class TrayManager {
+  tray = null;
+  createTray() {
+    try {
+      const assetPath = electron.app.isPackaged ? path.join(process.resourcesPath, "assets") : path.join(electron.app.getAppPath(), "assets");
+      const trayIcon = path.join(assetPath, "tray-icon.png");
+      if (fs.existsSync(trayIcon)) {
+        this.tray = new electron.Tray(trayIcon);
+      } else {
+        console.warn("Tray icon not found at:", trayIcon);
+        return;
+      }
+      const contextMenu = electron.Menu.buildFromTemplate([
+        {
+          label: "Show Character",
+          click: () => windowManager.show()
+        },
+        {
+          label: "Settings",
+          click: () => windowManager.openSettings()
+        },
+        { type: "separator" },
+        {
+          label: "Quit",
+          click: () => electron.app.quit()
+        }
+      ]);
+      this.tray.setToolTip("AI Character Assistant");
+      this.tray.setContextMenu(contextMenu);
+    } catch (e) {
+      console.error("Tray icon creation failed", e);
+    }
+  }
+}
+const trayManager = new TrayManager();
 var SchemaType;
 (function(SchemaType2) {
   SchemaType2["STRING"] = "string";
@@ -966,176 +1070,118 @@ class GoogleGenerativeAI {
     return new GenerativeModel(this.apiKey, modelParamsFromCache, requestOptions);
   }
 }
-let mainWindow;
-let tray;
-process.env.NODE_ENV === "development";
-const FIXED_WIDTH = 350;
-const FIXED_HEIGHT = 450;
-const DIST = path.join(__dirname, "../dist");
-electron.app.isPackaged ? DIST : path.join(DIST, "../public");
-const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
-function createWindow() {
-  const primaryDisplay = electron.screen.getPrimaryDisplay();
-  const { width, height } = primaryDisplay.workAreaSize;
-  mainWindow = new electron.BrowserWindow({
-    width: FIXED_WIDTH,
-    height: FIXED_HEIGHT,
-    x: width - 340,
-    y: height - 300,
-    frame: false,
-    transparent: true,
-    backgroundColor: "#00000000",
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    resizable: false,
-    hasShadow: false,
-    webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
-      contextIsolation: true,
-      nodeIntegration: false
-    }
-  });
-  if (VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(VITE_DEV_SERVER_URL);
-  } else {
-    mainWindow.loadFile(path.join(DIST, "index.html"));
+class GeminiService {
+  logPath;
+  constructor() {
+    this.logPath = path.join(electron.app.getPath("userData"), "conversation_log.txt");
   }
-  mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  mainWindow.webContents.on("console-message", (event, ...args) => {
-    let message = "";
-    if (args.length === 1 && typeof args[0] === "object") {
-      message = args[0].message;
-    } else if (args.length > 1) {
-      message = args[1];
-    }
-    console.log(`[Renderer] ${message}`);
-  });
-}
-function createTray() {
-  path.join(electron.app.getAppPath(), "assets/tray-icon.png");
-  try {
-    const assetPath = electron.app.isPackaged ? path.join(process.resourcesPath, "assets") : path.join(electron.app.getAppPath(), "assets");
-    const trayIcon = path.join(assetPath, "tray-icon.png");
-    if (fs.existsSync(trayIcon)) {
-      tray = new electron.Tray(trayIcon);
-    } else {
-      console.log("Tray icon not found at:", trayIcon);
-      return;
-    }
-  } catch (e) {
-    console.log("Tray icon creation failed", e);
-    return;
-  }
-  const contextMenu = electron.Menu.buildFromTemplate([
-    {
-      label: "Show Character",
-      click: () => mainWindow?.show()
-    },
-    {
-      label: "Settings",
-      click: () => mainWindow?.webContents.send("open-settings")
-    },
-    { type: "separator" },
-    {
-      label: "Quit",
-      click: () => electron.app.quit()
-    }
-  ]);
-  tray.setToolTip("AI Character Assistant");
-  tray.setContextMenu(contextMenu);
-}
-electron.ipcMain.handle("send-message", async (event, { message, config }) => {
-  const logPath = path.join(electron.app.getPath("userData"), "conversation_log.txt");
-  const timestamp = (/* @__PURE__ */ new Date()).toISOString();
-  try {
-    fs.appendFileSync(logPath, `
-[${timestamp}] USER: ${message}
-`);
-  } catch (e) {
-    console.error("Error writing log", e);
-  }
-  try {
+  async generateResponse(message, config) {
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+    this.log(`
+[${timestamp}] USER: ${message}`);
     if (!config.apiKey) {
       const errorMsg = "Please set your API key in settings!";
-      fs.appendFileSync(logPath, `[${timestamp}] ERROR: ${errorMsg}
-`);
+      this.log(`[${timestamp}] ERROR: ${errorMsg}`);
       return { error: errorMsg };
     }
-    const genAI = new GoogleGenerativeAI(config.apiKey);
-    const selectedModel = config.geminiModel || "gemini-2.0-flash";
-    const model = genAI.getGenerativeModel({ model: selectedModel });
-    fs.appendFileSync(logPath, `[${timestamp}] USING MODEL: ${selectedModel}
-`);
-    const systemPrompt = buildSystemPrompt(config.personality, config.characterName);
-    fs.appendFileSync(logPath, `[${timestamp}] SYSTEM PROMPT: ${systemPrompt}
-`);
-    const result = await model.generateContent([
-      { text: systemPrompt },
-      { text: message }
-    ]);
-    const responseText = result.response.text();
-    fs.appendFileSync(logPath, `[${timestamp}] AI RESPONSE: ${responseText}
-`);
-    return { response: responseText };
-  } catch (error) {
-    console.error("AI Error:", error);
     try {
-      fs.appendFileSync(logPath, `[${timestamp}] AI ERROR: ${error.message}
-[${timestamp}] FULL ERROR: ${JSON.stringify(error, null, 2)}
-`);
-    } catch (e) {
+      const genAI = new GoogleGenerativeAI(config.apiKey);
+      const selectedModel = config.geminiModel || "gemini-2.0-flash";
+      const model = genAI.getGenerativeModel({ model: selectedModel });
+      this.log(`[${timestamp}] USING MODEL: ${selectedModel}`);
+      const systemPrompt = this.buildSystemPrompt(config.personality, config.characterName);
+      this.log(`[${timestamp}] SYSTEM PROMPT: ${systemPrompt}`);
+      const result = await model.generateContent([
+        { text: systemPrompt },
+        { text: message }
+      ]);
+      const responseText = result.response.text();
+      this.log(`[${timestamp}] AI RESPONSE: ${responseText}`);
+      return { response: responseText };
+    } catch (error) {
+      console.error("AI Error:", error);
+      this.log(`[${timestamp}] AI ERROR: ${error.message}
+[${timestamp}] FULL ERROR: ${JSON.stringify(error, null, 2)}`);
+      return { error: error.message };
     }
-    return { error: error.message };
   }
-});
-function buildSystemPrompt(personality, characterName) {
-  const traits = personality || ["helpful", "quirky", "playful"];
-  return `You are ${characterName || "Foxy"}, a cute and adorable AI companion that lives on the user's desktop.
+  buildSystemPrompt(personality, characterName) {
+    const traits = personality || ["helpful", "quirky", "playful"];
+    return `You are ${characterName || "Foxy"}, a cute and adorable AI companion that lives on the user's desktop.
 Your personality traits are: ${traits.join(", ")}.
 Keep responses SHORT (1-3 sentences max) since they appear in a small speech bubble.
 Be expressive and use occasional emojis to convey emotion.
 You were just poked/clicked by the user, so you might react to that playfully.`;
-}
-electron.ipcMain.handle("save-config", async (event, config) => {
-  const configPath = path.join(electron.app.getPath("userData"), "config.json");
-  fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-  return { success: true };
-});
-electron.ipcMain.handle("load-config", async () => {
-  const configPath = path.join(electron.app.getPath("userData"), "config.json");
-  try {
-    const data = fs.readFileSync(configPath, "utf8");
-    return JSON.parse(data);
-  } catch (e) {
-    return {
-      provider: "gemini",
-      apiKey: "",
-      theme: "fox",
-      characterName: "Foxy",
-      personality: ["helpful", "quirky", "playful"]
-    };
   }
-});
-electron.app.whenReady().then(() => {
-  createWindow();
-  setTimeout(createTray, 500);
-  electron.ipcMain.handle("get-window-bounds", () => {
-    if (mainWindow) {
-      return mainWindow.getBounds();
+  log(message) {
+    try {
+      fs.appendFileSync(this.logPath, message + "\n");
+    } catch (e) {
+      console.error("Error writing log", e);
     }
-    return { x: 0, y: 0, width: FIXED_WIDTH, height: FIXED_HEIGHT };
+  }
+}
+const geminiService = new GeminiService();
+class ConfigService {
+  configPath;
+  constructor() {
+    this.configPath = path.join(electron.app.getPath("userData"), "config.json");
+  }
+  load() {
+    try {
+      const data = fs.readFileSync(this.configPath, "utf8");
+      return JSON.parse(data);
+    } catch (e) {
+      return {
+        provider: "gemini",
+        apiKey: "",
+        theme: "fox",
+        characterName: "Foxy",
+        personality: ["helpful", "quirky", "playful"]
+      };
+    }
+  }
+  save(config) {
+    try {
+      fs.writeFileSync(this.configPath, JSON.stringify(config, null, 2));
+      return true;
+    } catch (e) {
+      console.error("Failed to save config:", e);
+      return false;
+    }
+  }
+}
+const configService = new ConfigService();
+function registerIpcHandlers() {
+  electron.ipcMain.handle("send-message", async (event, { message, config }) => {
+    return await geminiService.generateResponse(message, config);
+  });
+  electron.ipcMain.handle("save-config", async (event, config) => {
+    return { success: configService.save(config) };
+  });
+  electron.ipcMain.handle("load-config", async () => {
+    return configService.load();
+  });
+  electron.ipcMain.handle("get-window-bounds", () => {
+    const win = windowManager.getMainWindow();
+    if (win) {
+      return win.getBounds();
+    }
+    return { x: 0, y: 0, width: 350, height: 450 };
   });
   electron.ipcMain.on("set-window-size", (event, { width, height }) => {
-    if (mainWindow) {
-      mainWindow.setSize(width || FIXED_WIDTH, height || FIXED_HEIGHT);
+    const win = windowManager.getMainWindow();
+    if (win) {
+      win.setSize(width || 350, height || 450);
     }
   });
   electron.ipcMain.on("set-window-position", (event, { x, y, width, height }) => {
-    if (mainWindow) {
-      const currentBounds = mainWindow.getBounds();
+    const win = windowManager.getMainWindow();
+    if (win) {
+      const currentBounds = win.getBounds();
       const w = width || currentBounds.width;
       const h = height || currentBounds.height;
-      mainWindow.setBounds({
+      win.setBounds({
         x: Math.round(x),
         y: Math.round(y),
         width: w,
@@ -1147,10 +1193,14 @@ electron.app.whenReady().then(() => {
     const win = electron.BrowserWindow.fromWebContents(event.sender);
     win?.setIgnoreMouseEvents(ignore, options);
   });
+}
+electron.app.commandLine.appendSwitch("ozone-platform-hint", "x11");
+electron.app.whenReady().then(() => {
+  windowManager.createMainWindow();
+  setTimeout(() => trayManager.createTray(), 500);
+  registerIpcHandlers();
   electron.app.on("activate", () => {
-    if (electron.BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
+    windowManager.createMainWindow();
   });
 });
 electron.app.on("window-all-closed", () => {
