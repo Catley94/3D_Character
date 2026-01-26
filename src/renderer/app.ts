@@ -2,7 +2,7 @@
 import { state } from './modules/store';
 import { setupClickThrough } from './modules/interactions';
 import { initCharacter } from './modules/character';
-import { initChat } from './modules/chat';
+import { initChat, activateChat } from './modules/chat';
 import { initSettings, applyConfig } from './modules/settings';
 
 async function init() {
@@ -19,6 +19,11 @@ async function init() {
 
     // Apply config (updates UI, State, Theme)
     applyConfig(config);
+
+    // Listen for Global Shortcut
+    window.electronAPI.onActivateChat(() => {
+        activateChat();
+    });
 
     console.log('[Renderer] Ready!');
 }

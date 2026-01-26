@@ -3,9 +3,14 @@ import { showSpeechBubble, showChatInput } from './chat';
 
 // DOM Elements
 const character = document.getElementById('character') as HTMLDivElement;
+const characterContainer = document.getElementById('character-container') as HTMLDivElement;
 const characterImg = document.getElementById('character-img') as HTMLImageElement;
 const backpack = document.getElementById('backpack') as HTMLDivElement;
 const chatInputContainer = document.getElementById('chat-input-container') as HTMLDivElement;
+
+// ... (constants are fine)
+
+
 
 // Constants
 const clickReactions = [
@@ -18,17 +23,40 @@ const clickReactions = [
 
 // Drag State
 let dragStartMouseX: number, dragStartMouseY: number;
-let dragStartWinX: number, dragStartWinY: number;
-let dragStartWidth: number, dragStartHeight: number;
+// Store initial element position
+let dragStartLeft: number, dragStartTop: number;
 
 export function initCharacter() {
     character.addEventListener('click', onCharacterClick);
-    character.addEventListener('mousedown', startDrag);
-
-    document.addEventListener('mousemove', onDragMove);
-    document.addEventListener('mouseup', () => { state.isDragging = false; });
 
     updateCharacterTheme(state.config.theme || 'fox');
+
+    // Dragging (Pointer Events + Capture)
+    characterContainer.addEventListener('pointerdown', startDrag);
+    characterContainer.addEventListener('pointermove', onDragMove);
+    characterContainer.addEventListener('pointerup', (e) => {
+        if (state.isDragging) {
+            state.isDragging = false;
+            window.electronAPI.setDragging(false);
+            characterContainer.releasePointerCapture(e.pointerId);
+
+            // MANUALLY TRIGGER CLICK if we didn't drag
+            // This is required because Pointer Capture often suppresses the 'click' event
+            if (!state.hasDragged) {
+                onCharacterClick(e as unknown as MouseEvent);
+            }
+        }
+    });
+    // lostpointercapture handles alt-tab or system interruptions
+    characterContainer.addEventListener('lostpointercapture', () => {
+        if (state.isDragging) {
+            state.isDragging = false;
+            window.electronAPI.setDragging(false);
+        }
+    });
+
+    // Initialize position if saved (TODO: Load from config)
+    // For now, respect CSS default (bottom-right)
 }
 
 export function setState(newState: CharacterStateValue) {
@@ -71,7 +99,6 @@ function onCharacterClick(e: MouseEvent) {
     // If already showing input or typing, don't react again
     if (!chatInputContainer.classList.contains('hidden') || state.isTyping || state.hasDragged) return;
 
-    console.log('[Character] Clicked');
     handleCharacterClick();
 }
 
@@ -90,39 +117,36 @@ function handleCharacterClick() {
 
 // ===== Drag Logic =====
 
-async function startDrag(e: MouseEvent) {
+function startDrag(e: PointerEvent) {
     // Don't start drag if clicking on backpack
     if (e.target === backpack || backpack.contains(e.target as Node)) return;
 
-    // Don't allow dragging when window is locked (during AI response)
+    // Don't allow dragging when window is locked
     if (state.isWindowLocked) return;
 
     state.isDragging = true;
     state.hasDragged = false;
-    dragStartMouseX = e.screenX;
+    dragStartMouseX = e.screenX; // Use absolute screen coordinates for window drag
     dragStartMouseY = e.screenY;
 
-    // Get initial window position AND size
-    const bounds = await window.electronAPI.getWindowBounds();
-    dragStartWinX = bounds.x;
-    dragStartWinY = bounds.y;
-    dragStartWidth = bounds.width;
-    dragStartHeight = bounds.height;
-
-    e.preventDefault();
+    // Capture pointer to ensure we receive events
+    characterContainer.setPointerCapture(e.pointerId);
 }
 
-function onDragMove(e: MouseEvent) {
+function onDragMove(e: PointerEvent) {
     if (!state.isDragging) return;
 
-    // Calculate absolute target position based on initial position + mouse movement
-    const targetX = dragStartWinX + (e.screenX - dragStartMouseX);
-    const targetY = dragStartWinY + (e.screenY - dragStartMouseY);
+    const deltaX = e.screenX - dragStartMouseX;
+    const deltaY = e.screenY - dragStartMouseY;
 
-    if (Math.abs(e.screenX - dragStartMouseX) > 3 || Math.abs(e.screenY - dragStartMouseY) > 3) {
+    if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
         state.hasDragged = true;
     }
 
-    // Force strict size maintenance during drag
-    window.electronAPI.setWindowPosition(targetX, targetY, dragStartWidth, dragStartHeight);
+    // Move the window itself
+    window.electronAPI.dragWindow(deltaX, deltaY);
+
+    // Update start position for next delta
+    dragStartMouseX = e.screenX;
+    dragStartMouseY = e.screenY;
 }

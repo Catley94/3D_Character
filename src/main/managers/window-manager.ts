@@ -25,35 +25,33 @@ export class WindowManager {
         return path.join(__dirname, 'preload.js');
     }
 
-    public createMainWindow() {
-        if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-            this.mainWindow.show();
-            return;
-        }
-
-        const primaryDisplay = screen.getPrimaryDisplay();
-        const { width, height } = primaryDisplay.workAreaSize;
+    public createMainWindow(): void {
+        // Small Box Mode (Restored)
+        // This provides the most reliable interaction on Linux (X11/Wayland)
+        const width = 350;
+        const height = 450;
 
         this.mainWindow = new BrowserWindow({
-            width: this.MIN_WIDTH,
-            height: this.MIN_HEIGHT,
-            x: width - this.MIN_WIDTH - 20,
-            y: height - this.MIN_HEIGHT - 20,
+            width,
+            height,
             frame: false,
             transparent: true,
             backgroundColor: '#00000000',
             alwaysOnTop: true,
             skipTaskbar: true,
-            resizable: true,  // Allow dynamic resizing
+            resizable: false,
             hasShadow: false,
-            minWidth: this.MIN_WIDTH,
-            minHeight: this.MIN_HEIGHT,
             webPreferences: {
                 preload: this.getPreloadPath(),
+                nodeIntegration: false,
                 contextIsolation: true,
-                nodeIntegration: false
+                backgroundThrottling: false
             }
         });
+
+        // Position bottom-right
+        const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize;
+        this.mainWindow.setPosition(screenW - width - 20, screenH - height - 20);
 
         if (this.VITE_DEV_SERVER_URL) {
             this.mainWindow.loadURL(this.VITE_DEV_SERVER_URL);

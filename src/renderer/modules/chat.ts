@@ -137,6 +137,12 @@ async function typeText(text: string) {
 
 // ===== Chat Input Logic =====
 
+export function activateChat() {
+    setState(CharacterState.LISTENING);
+    showSpeechBubble("Hi there! What's up?");
+    showChatInput();
+}
+
 export function showChatInput() {
     chatInputContainer.classList.remove('hidden');
     chatInput.focus();

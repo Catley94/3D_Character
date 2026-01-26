@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // Click-through control
     setIgnoreMouseEvents: (ignore: boolean, options?: any) => ipcRenderer.send('set-ignore-mouse-events', ignore, options),
+    setWindowShape: (rects: { x: number, y: number, width: number, height: number }[]) => ipcRenderer.send('set-window-shape', rects),
     getCursorScreenPoint: () => ipcRenderer.invoke('get-cursor-screen-point'),
 
     // AI communication
@@ -20,5 +21,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     loadConfig: () => ipcRenderer.invoke('load-config'),
 
     // Listen for main process events
-    onOpenSettings: (callback: () => void) => ipcRenderer.on('open-settings', callback)
+    onOpenSettings: (callback: () => void) => ipcRenderer.on('open-settings', callback),
+    onCursorBoundsChanged: (callback: (inBounds: boolean) => void) => {
+        ipcRenderer.on('cursor-bounds-changed', (event, data) => callback(data.inBounds));
+    },
+    onCursorPosition: (callback: (data: { x: number, y: number }) => void) => {
+        ipcRenderer.on('cursor-position', (event, data) => callback(data));
+    },
+
+    // Drag State Sync
+    setDragging: (isDragging: boolean) => ipcRenderer.send('set-dragging', isDragging),
+
+    // Activation
+    onActivateChat: (callback: () => void) => ipcRenderer.on('activate-chat', callback)
 });
