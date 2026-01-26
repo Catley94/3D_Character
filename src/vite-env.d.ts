@@ -14,6 +14,7 @@ export interface ElectronAPI {
     onCursorBoundsChanged: (callback: (data: { inBounds: boolean }) => void) => void;
     onCursorPosition: (callback: (data: { x: number, y: number }) => void) => void;
     setDragging: (isDragging: boolean) => void;
+    setOverInteractive: (isInteractive: boolean) => void; // Linux click fix
     onActivateChat: (callback: () => void) => void;
 }
 

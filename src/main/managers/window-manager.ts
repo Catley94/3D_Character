@@ -26,14 +26,16 @@ export class WindowManager {
     }
 
     public createMainWindow(): void {
-        // Small Box Mode (Restored)
-        // This provides the most reliable interaction on Linux (X11/Wayland)
-        const width = 350;
-        const height = 450;
+        // Full Screen Overlay Mode
+        // Use full screen for click-through overlay with fox movement within bounds
+        const display = screen.getPrimaryDisplay();
+        const { width, height } = display.bounds;
 
         this.mainWindow = new BrowserWindow({
             width,
             height,
+            x: 0,
+            y: 0,
             frame: false,
             transparent: true,
             backgroundColor: '#00000000',
@@ -41,6 +43,7 @@ export class WindowManager {
             skipTaskbar: true,
             resizable: false,
             hasShadow: false,
+            focusable: false, // Critical for Linux click-through - prevents focus stealing
             webPreferences: {
                 preload: this.getPreloadPath(),
                 nodeIntegration: false,
@@ -48,10 +51,6 @@ export class WindowManager {
                 backgroundThrottling: false
             }
         });
-
-        // Position bottom-right
-        const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize;
-        this.mainWindow.setPosition(screenW - width - 20, screenH - height - 20);
 
         if (this.VITE_DEV_SERVER_URL) {
             this.mainWindow.loadURL(this.VITE_DEV_SERVER_URL);

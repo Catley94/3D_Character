@@ -38,10 +38,10 @@ export function initCharacter() {
         if (state.isDragging) {
             state.isDragging = false;
             window.electronAPI.setDragging(false);
+            document.body.classList.remove('is-dragging'); // Clear visual override
             characterContainer.releasePointerCapture(e.pointerId);
 
             // MANUALLY TRIGGER CLICK if we didn't drag
-            // This is required because Pointer Capture often suppresses the 'click' event
             if (!state.hasDragged) {
                 onCharacterClick(e as unknown as MouseEvent);
             }
@@ -52,6 +52,7 @@ export function initCharacter() {
         if (state.isDragging) {
             state.isDragging = false;
             window.electronAPI.setDragging(false);
+            document.body.classList.remove('is-dragging'); // Clear visual override
         }
     });
 
@@ -117,6 +118,9 @@ function handleCharacterClick() {
 
 // ===== Drag Logic =====
 
+// Track if we're using custom position (dragged) vs CSS default
+let isCustomPosition = false;
+
 function startDrag(e: PointerEvent) {
     // Don't start drag if clicking on backpack
     if (e.target === backpack || backpack.contains(e.target as Node)) return;
@@ -126,27 +130,60 @@ function startDrag(e: PointerEvent) {
 
     state.isDragging = true;
     state.hasDragged = false;
-    dragStartMouseX = e.screenX; // Use absolute screen coordinates for window drag
-    dragStartMouseY = e.screenY;
+    dragStartMouseX = e.clientX;
+    dragStartMouseY = e.clientY;
+
+    // Get current position
+    const rect = characterContainer.getBoundingClientRect();
+    dragStartLeft = rect.left;
+    dragStartTop = rect.top;
 
     // Capture pointer to ensure we receive events
     characterContainer.setPointerCapture(e.pointerId);
+
+    // Tell main process dragging started
+    window.electronAPI.setDragging(true);
+    document.body.classList.add('is-dragging'); // Visual override
+
+    // Ensure we are interactive
+    window.electronAPI.setIgnoreMouseEvents(false);
 }
 
 function onDragMove(e: PointerEvent) {
     if (!state.isDragging) return;
 
-    const deltaX = e.screenX - dragStartMouseX;
-    const deltaY = e.screenY - dragStartMouseY;
+    const deltaX = e.clientX - dragStartMouseX;
+    const deltaY = e.clientY - dragStartMouseY;
 
     if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
         state.hasDragged = true;
     }
 
-    // Move the window itself
-    window.electronAPI.dragWindow(deltaX, deltaY);
+    // Calculate new position
+    let newLeft = dragStartLeft + deltaX;
+    let newTop = dragStartTop + deltaY;
 
-    // Update start position for next delta
-    dragStartMouseX = e.screenX;
-    dragStartMouseY = e.screenY;
+    // Get container size for boundary constraints
+    const containerRect = characterContainer.getBoundingClientRect();
+    const containerWidth = containerRect.width;
+    const containerHeight = containerRect.height;
+
+    // Boundary constraints - keep within viewport
+    const maxLeft = window.innerWidth - containerWidth;
+    const maxTop = window.innerHeight - containerHeight;
+
+    newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+    newTop = Math.max(0, Math.min(newTop, maxTop));
+
+    // Switch to absolute positioning from default (right/bottom)
+    if (!isCustomPosition) {
+        isCustomPosition = true;
+        characterContainer.style.right = 'auto';
+        characterContainer.style.bottom = 'auto';
+    }
+
+    // Apply new position
+    characterContainer.style.left = `${newLeft}px`;
+    characterContainer.style.top = `${newTop}px`;
 }
+

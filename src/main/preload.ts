@@ -32,6 +32,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Drag State Sync
     setDragging: (isDragging: boolean) => ipcRenderer.send('set-dragging', isDragging),
 
+    // Linux click fix: report when cursor is over interactive elements
+    setOverInteractive: (isInteractive: boolean) => ipcRenderer.send('set-over-interactive', isInteractive),
+
     // Activation
     onActivateChat: (callback: () => void) => ipcRenderer.on('activate-chat', callback)
 });

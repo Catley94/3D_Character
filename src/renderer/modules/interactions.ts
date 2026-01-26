@@ -56,7 +56,8 @@ export function setupClickThrough() {
             const el = item.el!;
             const isHovered = isPointInRect(x, y, el);
 
-            if (isHovered) {
+            // Only show hover effect if NOT dragging
+            if (isHovered && !state.isDragging) {
                 if (!el.classList.contains('manual-hover')) {
                     el.classList.add('manual-hover');
                 }
@@ -65,17 +66,31 @@ export function setupClickThrough() {
                 if (el.classList.contains('manual-hover')) {
                     el.classList.remove('manual-hover');
                 }
+                // If dragging, we are definitely interactive (don't click through)
+                if (state.isDragging) anyInteractive = true;
             }
         });
 
-        // Update Ignore State based on hit test
-        // note: checks are fine-grained
+        // LINUX CLICK FIX: Report interactive state to main process
+        // Main process handles setIgnoreMouseEvents directly to bypass X11 quirks
         if (!state.isDragging) {
-            if (anyInteractive) {
-                window.electronAPI.setIgnoreMouseEvents(false);
-            } else {
-                window.electronAPI.setIgnoreMouseEvents(true, { forward: true });
-            }
+            window.electronAPI.setOverInteractive(anyInteractive);
+        }
+    });
+
+    // ========================================
+    // CURSOR EXIT CLEANUP
+    // ========================================
+    window.electronAPI.onCursorBoundsChanged((data: { inBounds: boolean }) => {
+        if (!data.inBounds) {
+            // Force Clear All Hover States
+            hoverElements.forEach(item => {
+                if (item.el && item.el.classList.contains('manual-hover')) {
+                    item.el.classList.remove('manual-hover');
+                }
+            });
+            // Ensure we are transparent
+            window.electronAPI.setIgnoreMouseEvents(true, { forward: true });
         }
     });
 

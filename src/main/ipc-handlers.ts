@@ -96,4 +96,9 @@ export function registerIpcHandlers() {
         }
     });
 
+    // Linux click fix: renderer reports when cursor is over interactive elements
+    ipcMain.on('set-over-interactive', (event, isInteractive: boolean) => {
+        cursorMonitor.setOverInteractive(isInteractive);
+    });
+
 }

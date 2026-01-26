@@ -4,6 +4,9 @@ import { windowManager } from '../managers/window-manager';
 /**
  * Main-process cursor monitor that runs independently of renderer throttling.
  * This solves the issue where browser setTimeout/rAF get throttled when window loses focus.
+ * 
+ * LINUX FIX: Also handles forcing mouse events to be re-enabled, bypassing X11 quirks
+ * where setIgnoreMouseEvents can get "stuck" when window is unfocused.
  */
 export class CursorMonitor {
     private intervalId: NodeJS.Timeout | null = null;
@@ -12,15 +15,25 @@ export class CursorMonitor {
     private syntheticEventsEnabled = true;
     private lastLog = 0;
 
+    // Linux click fix: track interactive state from renderer
+    private isOverInteractive = false;
+    private lastForceReset = 0;
+    private readonly FORCE_RESET_INTERVAL = 200; // ms - periodically force re-enable
+
     setSyntheticEventsEnabled(enabled: boolean) {
         this.syntheticEventsEnabled = enabled;
         console.log(`[CursorMonitor] Synthetic events ${enabled ? 'ENABLED' : 'DISABLED'}`);
     }
 
+    // Called by renderer when cursor is over an interactive element
+    setOverInteractive(isInteractive: boolean) {
+        this.isOverInteractive = isInteractive;
+    }
+
     start() {
         if (this.intervalId) return;
 
-        console.log('[CursorMonitor] Starting main-process polling...');
+        console.log('[CursorMonitor] Starting main-process polling (Full Screen Mode)...');
 
         this.intervalId = setInterval(() => {
             this.checkCursor();
@@ -42,69 +55,47 @@ export class CursorMonitor {
         // Get window bounds (Logical Pixels / DIPs)
         const bounds = win.getBounds();
 
-        // Get cursor position (Physical Pixels on Linux usually)
+        // Get cursor position
         const rawCursor = screen.getCursorScreenPoint();
 
-        // Find which display the window is primarily on
-        const display = screen.getDisplayMatching(bounds);
-        const scaleFactor = display.scaleFactor;
-
-        // Apply scaling correction: Physical -> Logical
-        // CALIBRATION RESULT: User saw Raw(865) matching Window(859).
-        // This means getCursorScreenPoint is ALREADY returning logical pixels matching getBounds.
-        // Dividing by scaleFactor (1.125) caused an error (865 -> 769).
-        // So we use rawCursor directly.
         const cursor = {
             x: rawCursor.x,
             y: rawCursor.y
         };
 
-        // Debug logging every ~100 calls (5 seconds) to avoid spam but confirm life
+        // Debug logging every ~2 seconds
         const now = Date.now();
         if (now - this.lastLog > 2000) {
             this.lastLog = now;
             try {
-                console.log(`[CursorMonitor] Heartbeat: Raw(${rawCursor.x},${rawCursor.y}) Scale(${scaleFactor}) Logical(${cursor.x},${cursor.y}) Win(${bounds.x},${bounds.y}) Focused:${win.isFocused()}`);
+                console.log(`[CursorMonitor] Heartbeat: Cursor(${cursor.x},${cursor.y}) Interactive:${this.isOverInteractive}`);
             } catch (e) {
                 console.log('[CursorMonitor] Heartbeat error', e);
             }
         }
 
         try {
-            // Simple bounds check - is cursor within the window?
-            const inBounds =
-                cursor.x >= bounds.x &&
-                cursor.x <= bounds.x + bounds.width &&
-                cursor.y >= bounds.y &&
-                cursor.y <= bounds.y + bounds.height;
+            // In full-screen mode, we're always "in bounds"
+            // Calculate local coordinates
+            const localX = cursor.x - bounds.x;
+            const localY = cursor.y - bounds.y;
 
-            // 1. Send cursor-bounds-changed event (for renderer logic)
-            if (inBounds !== this.lastCursorInBounds) {
-                this.lastCursorInBounds = inBounds;
+            // Always stream cursor position to renderer (full screen mode)
+            win.webContents.send('cursor-position', { x: localX, y: localY });
 
-                console.log(`[CursorMonitor] Cursor ${inBounds ? 'ENTERED' : 'LEFT'} window bounds`);
-
-                // Notify renderer of cursor bounds change
-                win.webContents.send('cursor-bounds-changed', { inBounds });
-
-                // Basic interactive state control - DISABLED for Fullscreen Overlay Mode
-                // Renderer now handles this based on element intersection
-                /*
-                if (inBounds) {
+            // LINUX CLICK FIX: Main process controls setIgnoreMouseEvents
+            // Periodically force re-enable when over interactive elements
+            // This combats X11 quirks where the state gets "stuck"
+            if (this.isOverInteractive) {
+                if (now - this.lastForceReset > this.FORCE_RESET_INTERVAL) {
+                    this.lastForceReset = now;
+                    // Force re-enable mouse events directly from main process
                     win.setIgnoreMouseEvents(false);
-                } else {
-                    win.setIgnoreMouseEvents(true, { forward: true });
                 }
-                */
-            }
-
-            // 2. Stream Coordinates for Manual Hover (Fallback Plan)
-            // Send LOCAL logical coordinates
-            if (inBounds) {
-                const localX = cursor.x - bounds.x;
-                const localY = cursor.y - bounds.y;
-
-                win.webContents.send('cursor-position', { x: localX, y: localY });
+            } else {
+                // Not over interactive - enable click-through
+                // Note: { forward: true } is NOT available on Linux, so we omit it
+                win.setIgnoreMouseEvents(true);
             }
         } catch (err) {
             console.error('[CursorMonitor] Error:', err);
@@ -117,9 +108,10 @@ export class CursorMonitor {
         if (win && !win.isDestroyed()) {
             console.log('[CursorMonitor] Forcing interactive mode');
             win.setIgnoreMouseEvents(false);
-            this.lastCursorInBounds = true;
+            this.isOverInteractive = true;
         }
     }
 }
 
 export const cursorMonitor = new CursorMonitor();
+

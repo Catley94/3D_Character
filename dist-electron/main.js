@@ -23,11 +23,13 @@ class WindowManager {
     return path.join(__dirname, "preload.js");
   }
   createMainWindow() {
-    const width = 350;
-    const height = 450;
+    const display = electron.screen.getPrimaryDisplay();
+    const { width, height } = display.bounds;
     this.mainWindow = new electron.BrowserWindow({
       width,
       height,
+      x: 0,
+      y: 0,
       frame: false,
       transparent: true,
       backgroundColor: "#00000000",
@@ -35,6 +37,8 @@ class WindowManager {
       skipTaskbar: true,
       resizable: false,
       hasShadow: false,
+      focusable: false,
+      // Critical for Linux click-through - prevents focus stealing
       webPreferences: {
         preload: this.getPreloadPath(),
         nodeIntegration: false,
@@ -42,8 +46,6 @@ class WindowManager {
         backgroundThrottling: false
       }
     });
-    const { width: screenW, height: screenH } = electron.screen.getPrimaryDisplay().workAreaSize;
-    this.mainWindow.setPosition(screenW - width - 20, screenH - height - 20);
     if (this.VITE_DEV_SERVER_URL) {
       this.mainWindow.loadURL(this.VITE_DEV_SERVER_URL);
     } else {
@@ -1166,13 +1168,22 @@ class CursorMonitor {
   // ms
   syntheticEventsEnabled = true;
   lastLog = 0;
+  // Linux click fix: track interactive state from renderer
+  isOverInteractive = false;
+  lastForceReset = 0;
+  FORCE_RESET_INTERVAL = 200;
+  // ms - periodically force re-enable
   setSyntheticEventsEnabled(enabled) {
     this.syntheticEventsEnabled = enabled;
     console.log(`[CursorMonitor] Synthetic events ${enabled ? "ENABLED" : "DISABLED"}`);
   }
+  // Called by renderer when cursor is over an interactive element
+  setOverInteractive(isInteractive) {
+    this.isOverInteractive = isInteractive;
+  }
   start() {
     if (this.intervalId) return;
-    console.log("[CursorMonitor] Starting main-process polling...");
+    console.log("[CursorMonitor] Starting main-process polling (Full Screen Mode)...");
     this.intervalId = setInterval(() => {
       this.checkCursor();
     }, this.POLL_INTERVAL);
@@ -1189,8 +1200,6 @@ class CursorMonitor {
     if (!win || win.isDestroyed()) return;
     const bounds = win.getBounds();
     const rawCursor = electron.screen.getCursorScreenPoint();
-    const display = electron.screen.getDisplayMatching(bounds);
-    const scaleFactor = display.scaleFactor;
     const cursor = {
       x: rawCursor.x,
       y: rawCursor.y
@@ -1199,22 +1208,22 @@ class CursorMonitor {
     if (now - this.lastLog > 2e3) {
       this.lastLog = now;
       try {
-        console.log(`[CursorMonitor] Heartbeat: Raw(${rawCursor.x},${rawCursor.y}) Scale(${scaleFactor}) Logical(${cursor.x},${cursor.y}) Win(${bounds.x},${bounds.y}) Focused:${win.isFocused()}`);
+        console.log(`[CursorMonitor] Heartbeat: Cursor(${cursor.x},${cursor.y}) Interactive:${this.isOverInteractive}`);
       } catch (e) {
         console.log("[CursorMonitor] Heartbeat error", e);
       }
     }
     try {
-      const inBounds = cursor.x >= bounds.x && cursor.x <= bounds.x + bounds.width && cursor.y >= bounds.y && cursor.y <= bounds.y + bounds.height;
-      if (inBounds !== this.lastCursorInBounds) {
-        this.lastCursorInBounds = inBounds;
-        console.log(`[CursorMonitor] Cursor ${inBounds ? "ENTERED" : "LEFT"} window bounds`);
-        win.webContents.send("cursor-bounds-changed", { inBounds });
-      }
-      if (inBounds) {
-        const localX = cursor.x - bounds.x;
-        const localY = cursor.y - bounds.y;
-        win.webContents.send("cursor-position", { x: localX, y: localY });
+      const localX = cursor.x - bounds.x;
+      const localY = cursor.y - bounds.y;
+      win.webContents.send("cursor-position", { x: localX, y: localY });
+      if (this.isOverInteractive) {
+        if (now - this.lastForceReset > this.FORCE_RESET_INTERVAL) {
+          this.lastForceReset = now;
+          win.setIgnoreMouseEvents(false);
+        }
+      } else {
+        win.setIgnoreMouseEvents(true);
       }
     } catch (err) {
       console.error("[CursorMonitor] Error:", err);
@@ -1226,7 +1235,7 @@ class CursorMonitor {
     if (win && !win.isDestroyed()) {
       console.log("[CursorMonitor] Forcing interactive mode");
       win.setIgnoreMouseEvents(false);
-      this.lastCursorInBounds = true;
+      this.isOverInteractive = true;
     }
   }
 }
@@ -1301,6 +1310,9 @@ function registerIpcHandlers() {
         height: bounds.height
       });
     }
+  });
+  electron.ipcMain.on("set-over-interactive", (event, isInteractive) => {
+    cursorMonitor.setOverInteractive(isInteractive);
   });
 }
 electron.app.commandLine.appendSwitch("ozone-platform-hint", "x11");
