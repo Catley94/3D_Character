@@ -1,6 +1,7 @@
 import { state } from './store';
 import { updateCharacterTheme } from './character';
 import { showSpeechBubble, hideSpeechBubble } from './chat';
+import { invoke } from '@tauri-apps/api/core';
 
 // DOM Elements
 const settingsPanel = document.getElementById('settings-panel') as HTMLDivElement;
@@ -42,15 +43,15 @@ export function initSettings() {
         }
     });
 
-    // Listen for tray event
-    window.electronAPI.onOpenSettings(() => openSettings());
+    // Listen for tray event (TODO: Implement Tray in Rust)
+    // listen('open-settings', () => openSettings());
 }
 
 export function applyConfig(cfg: any) {
     state.config = cfg; // Update shared state
 
     apiProvider.value = cfg.provider || 'gemini';
-    apiKey.value = cfg.apiKey || '';
+    apiKey.value = cfg.geminiApiKey || cfg.apiKey || ''; // Support both keys
 
     const savedModel = cfg.geminiModel || 'gemini-2.0-flash';
     const isCustom = !Array.from(geminiModel.options).some(opt => opt.value === savedModel);
@@ -98,7 +99,7 @@ async function saveSettings() {
 
     const newConfig = {
         provider: apiProvider.value,
-        apiKey: apiKey.value,
+        geminiApiKey: apiKey.value, // Use specific key
         geminiModel: modelToSave,
         characterName: characterName.value,
         theme: themeSelect.value,
@@ -106,10 +107,15 @@ async function saveSettings() {
         debugMode: debugModeCheckbox.checked
     };
 
-    await window.electronAPI.saveConfig(newConfig);
-    applyConfig(newConfig); // Re-apply to update UI/State
-    closeSettings();
+    try {
+        await invoke('save_config', { config: newConfig });
+        applyConfig(newConfig);
+        closeSettings();
 
-    showSpeechBubble("Settings saved! ✨");
-    setTimeout(hideSpeechBubble, 2000);
+        showSpeechBubble("Settings saved! ✨");
+        setTimeout(hideSpeechBubble, 2000);
+    } catch (e) {
+        console.error("Failed to save config", e);
+        showSpeechBubble("Error saving settings! 😢");
+    }
 }

@@ -1,4 +1,4 @@
-/// <reference path="../vite-env.d.ts" />
+import { listen } from '@tauri-apps/api/event';
 import { state } from './modules/store';
 import { setupClickThrough } from './modules/interactions';
 import { initCharacter } from './modules/character';
@@ -6,10 +6,11 @@ import { initChat, activateChat } from './modules/chat';
 import { initSettings, applyConfig } from './modules/settings';
 
 async function init() {
-    console.log('[Renderer] Initializing...');
+    console.log('[Renderer] Initializing (Tauri)...');
 
-    // Load initial config
-    const config = await window.electronAPI.loadConfig();
+    // Load initial config (TODO: Implement config loading via Tauri Command)
+    const config = { theme: 'fox' }; // Placeholder until we reimplement config loading
+    // const config = await invoke('load_config'); 
 
     // Initialize Modules
     setupClickThrough();
@@ -20,19 +21,14 @@ async function init() {
     // Apply config (updates UI, State, Theme)
     applyConfig(config);
 
-    // Listen for Global Shortcut
-    window.electronAPI.onActivateChat(() => {
-        activateChat();
-    });
-
-    // Listen for Drag Mode Toggle (Visual Indicator)
-    window.electronAPI.onToggleDragMode((isDragMode) => {
-        if (isDragMode) {
-            document.body.classList.add('drag-mode-active');
-            console.log('[Renderer] Drag Mode ON');
-        } else {
-            document.body.classList.remove('drag-mode-active');
-            console.log('[Renderer] Drag Mode OFF');
+    // Listen for Global Shortcut (Emitted from Rust)
+    await listen('shortcut', (event: any) => {
+        if (event.payload.name === 'toggle_chat') {
+            activateChat();
+        } else if (event.payload.name === 'toggle_drag') {
+            const isDragMode = document.body.classList.toggle('drag-mode-active');
+            console.log(`[Renderer] Drag Mode: ${isDragMode ? 'ON' : 'OFF'}`);
+            // TODO: Notify Rust to change window pass-through behavior if needed
         }
     });
 

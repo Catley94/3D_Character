@@ -32,12 +32,11 @@ export function initCharacter() {
     updateCharacterTheme(state.config.theme || 'fox');
 
     // Dragging (Pointer Events + Capture)
-    characterContainer.addEventListener('pointerdown', startDrag);
-    characterContainer.addEventListener('pointermove', onDragMove);
+    // Removed JS drag listeners to avoid conflict with data-tauri-drag-region
     characterContainer.addEventListener('pointerup', (e) => {
         if (state.isDragging) {
             state.isDragging = false;
-            window.electronAPI.setDragging(false);
+            // window.electronAPI.setDragging(false);
             document.body.classList.remove('is-dragging'); // Clear visual override
             characterContainer.releasePointerCapture(e.pointerId);
 
@@ -51,7 +50,7 @@ export function initCharacter() {
     characterContainer.addEventListener('lostpointercapture', () => {
         if (state.isDragging) {
             state.isDragging = false;
-            window.electronAPI.setDragging(false);
+            // window.electronAPI.setDragging(false); // Removed for Tauri
             document.body.classList.remove('is-dragging'); // Clear visual override
         }
     });
@@ -118,72 +117,8 @@ function handleCharacterClick() {
 
 // ===== Drag Logic =====
 
-// Track if we're using custom position (dragged) vs CSS default
-let isCustomPosition = false;
+// We rely on data-tauri-drag-region in HTML for native window dragging.
+// This is much smoother and handles the window movement automatically.
 
-function startDrag(e: PointerEvent) {
-    // Don't start drag if clicking on backpack
-    if (e.target === backpack || backpack.contains(e.target as Node)) return;
-
-    // Don't allow dragging when window is locked
-    if (state.isWindowLocked) return;
-
-    state.isDragging = true;
-    state.hasDragged = false;
-    dragStartMouseX = e.clientX;
-    dragStartMouseY = e.clientY;
-
-    // Get current position
-    const rect = characterContainer.getBoundingClientRect();
-    dragStartLeft = rect.left;
-    dragStartTop = rect.top;
-
-    // Capture pointer to ensure we receive events
-    characterContainer.setPointerCapture(e.pointerId);
-
-    // Tell main process dragging started
-    window.electronAPI.setDragging(true);
-    document.body.classList.add('is-dragging'); // Visual override
-
-    // Ensure we are interactive
-    window.electronAPI.setIgnoreMouseEvents(false);
-}
-
-function onDragMove(e: PointerEvent) {
-    if (!state.isDragging) return;
-
-    const deltaX = e.clientX - dragStartMouseX;
-    const deltaY = e.clientY - dragStartMouseY;
-
-    if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
-        state.hasDragged = true;
-    }
-
-    // Calculate new position
-    let newLeft = dragStartLeft + deltaX;
-    let newTop = dragStartTop + deltaY;
-
-    // Get container size for boundary constraints
-    const containerRect = characterContainer.getBoundingClientRect();
-    const containerWidth = containerRect.width;
-    const containerHeight = containerRect.height;
-
-    // Boundary constraints - keep within viewport
-    const maxLeft = window.innerWidth - containerWidth;
-    const maxTop = window.innerHeight - containerHeight;
-
-    newLeft = Math.max(0, Math.min(newLeft, maxLeft));
-    newTop = Math.max(0, Math.min(newTop, maxTop));
-
-    // Switch to absolute positioning from default (right/bottom)
-    if (!isCustomPosition) {
-        isCustomPosition = true;
-        characterContainer.style.right = 'auto';
-        characterContainer.style.bottom = 'auto';
-    }
-
-    // Apply new position
-    characterContainer.style.left = `${newLeft}px`;
-    characterContainer.style.top = `${newTop}px`;
-}
+// End of file
 

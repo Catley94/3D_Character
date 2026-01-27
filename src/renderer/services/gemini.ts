@@ -1,42 +1,34 @@
-import { app } from 'electron';
-import path from 'path';
-import fs from 'fs';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 /**
  * Handles interactions with Google's Gemini AI.
- * Also maintains a local conversation log for debugging/review.
+ * Running directly in the Frontend (Renderer).
  */
 export class GeminiService {
-    private logPath: string;
-
-    constructor() {
-        this.logPath = path.join(app.getPath('userData'), 'conversation_log.txt');
-    }
 
     public async generateResponse(message: string, config: any): Promise<{ response?: string; error?: string }> {
         const timestamp = new Date().toISOString();
 
         // 1. Log User Message
-        this.log(`\n[${timestamp}] USER: ${message}`);
+        console.log(`[Gemini] USER: ${message}`);
 
         // 2. Validate API Key
-        if (!config.apiKey) {
+        if (!config.geminiApiKey) { // Changed locally to match config key
             const errorMsg = 'Please set your API key in settings!';
-            this.log(`[${timestamp}] ERROR: ${errorMsg}`);
+            console.warn(`[Gemini] ERROR: ${errorMsg}`);
             return { error: errorMsg };
         }
 
         try {
             // 3. Initialize AI
-            const genAI = new GoogleGenerativeAI(config.apiKey);
+            const genAI = new GoogleGenerativeAI(config.geminiApiKey);
             const selectedModel = config.geminiModel || 'gemini-2.0-flash';
             const model = genAI.getGenerativeModel({ model: selectedModel });
-            this.log(`[${timestamp}] USING MODEL: ${selectedModel}`);
+            console.log(`[Gemini] USING MODEL: ${selectedModel}`);
 
             // 4. Build System Prompt
             const systemPrompt = this.buildSystemPrompt(config.personality, config.characterName);
-            this.log(`[${timestamp}] SYSTEM PROMPT: ${systemPrompt}`);
+            console.log(`[Gemini] SYSTEM PROMPT: ${systemPrompt}`);
 
             // 5. Generate Content
             const result = await model.generateContent([
@@ -45,14 +37,13 @@ export class GeminiService {
             ]);
 
             const responseText = result.response.text();
-            this.log(`[${timestamp}] AI RESPONSE: ${responseText}`);
+            console.log(`[Gemini] AI RESPONSE: ${responseText}`);
 
             return { response: responseText };
 
         } catch (error: any) {
             console.error('AI Error:', error);
-            this.log(`[${timestamp}] AI ERROR: ${error.message}\n[${timestamp}] FULL ERROR: ${JSON.stringify(error, null, 2)}`);
-            return { error: error.message };
+            return { error: error.message || 'Unknown AI Error' };
         }
     }
 
@@ -63,14 +54,6 @@ Your personality traits are: ${traits.join(', ')}.
 Keep responses SHORT (1-3 sentences max) since they appear in a small speech bubble.
 Be expressive and use occasional emojis to convey emotion.
 You were just poked/clicked by the user, so you might react to that playfully.`;
-    }
-
-    private log(message: string) {
-        try {
-            fs.appendFileSync(this.logPath, message + '\n');
-        } catch (e) {
-            console.error("Error writing log", e);
-        }
     }
 }
 

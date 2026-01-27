@@ -1,5 +1,7 @@
 import { state, CharacterState } from './store';
 import { setState } from './character';
+import { geminiService } from '../services/gemini';
+import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 
 // DOM Elements
 const speechBubble = document.getElementById('speech-bubble') as HTMLDivElement;
@@ -10,18 +12,20 @@ const chatInput = document.getElementById('chat-input') as HTMLInputElement;
 const sendBtn = document.getElementById('send-btn') as HTMLButtonElement;
 
 // Constants - Dynamic sizing
-const CHARACTER_HEIGHT = 180;  // Character image + padding
-const INPUT_HEIGHT = 60;       // Chat input container height
-const EXTRA_PADDING = 30;      // Extra padding for spacing
+const CHARACTER_HEIGHT = 180;
+const INPUT_HEIGHT = 60;
+const EXTRA_PADDING = 30;
 const MIN_WIDTH = 200;
-const CONTENT_WIDTH = 320;     // Width when content is shown
+const CONTENT_WIDTH = 320;
 
 // Timeout constants
-const TYPING_TIMEOUT_MS = 15000;    // Short timeout while typing (15s)
-const RESPONSE_TIMEOUT_MS = 60000;  // Long timeout after AI response (60s)
+const TYPING_TIMEOUT_MS = 15000;
+const RESPONSE_TIMEOUT_MS = 60000;
 
 let idleTimeout: NodeJS.Timeout | null = null;
 let bubbleTimeout: NodeJS.Timeout | null = null;
+
+const appWindow = getCurrentWindow();
 
 export function initChat() {
     sendBtn.addEventListener('click', sendMessage);
@@ -31,8 +35,6 @@ export function initChat() {
 
     // Prevent global shortcuts from typing characters
     chatInput.addEventListener('keydown', (e) => {
-        // Meta+Shift+D (Drag Mode)
-        // Note: On some systems Meta is captured, but we check just in case it leaks through
         if ((e.key.toLowerCase() === 'd') && e.shiftKey && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
             console.log('[Chat] Prevented Drag Mode shortcut input');
@@ -46,7 +48,8 @@ export function initChat() {
 
     // Ensure window is focusable when user clicks/focuses the input
     chatInput.addEventListener('click', () => {
-        window.electronAPI.setWindowFocusable(true);
+        appWindow.setFocus();
+        appWindow.setIgnoreCursorEvents(false);
         setTimeout(() => chatInput.focus(), 50);
     });
 
@@ -54,7 +57,6 @@ export function initChat() {
         console.log('[Chat] Input received focus event');
     });
 
-    // Reset idle timeout while typing
     chatInput.addEventListener('input', () => {
         if (idleTimeout) {
             clearIdleTimeout();
@@ -88,25 +90,23 @@ export function hideSpeechBubble() {
 
 function lockWindow() {
     state.isWindowLocked = true;
-    window.electronAPI.setWindowLocked(true);
+    // Window movement logic handle in renderer now (interactions.ts)
+    // Just need to ensure we don't process drags
     document.body.classList.add('window-locked');
 }
 
 function unlockWindow() {
     state.isWindowLocked = false;
-    window.electronAPI.setWindowLocked(false);
     document.body.classList.remove('window-locked');
 }
 
 function calculateWindowHeight(): number {
     let height = CHARACTER_HEIGHT;
 
-    // Add speech bubble height if visible
     if (!speechBubble.classList.contains('hidden')) {
         height += speechBubble.offsetHeight + 10;
     }
 
-    // Add input height if visible
     if (!chatInputContainer.classList.contains('hidden')) {
         height += INPUT_HEIGHT;
     }
@@ -114,14 +114,50 @@ function calculateWindowHeight(): number {
     return height + EXTRA_PADDING;
 }
 
-function updateWindowSize() {
+// Helper to get current window info
+import { LogicalPosition } from '@tauri-apps/api/window';
+
+async function updateWindowSize() {
     const hasContent = !speechBubble.classList.contains('hidden') ||
         !chatInputContainer.classList.contains('hidden');
 
-    const width = hasContent ? CONTENT_WIDTH : MIN_WIDTH;
-    const height = calculateWindowHeight();
+    // Base size for just the character
+    const baseWidth = 250;
+    const baseHeight = 250;
 
-    window.electronAPI.setWindowSize(width, height);
+    // Expanded size for chat/bubble
+    const expandedWidth = CONTENT_WIDTH; // 320
+    const expandedHeight = calculateWindowHeight(); // Dynamic based on content
+
+    const targetWidth = hasContent ? expandedWidth : baseWidth;
+    const targetHeight = hasContent ? expandedHeight : baseHeight;
+
+    // ANCHOR LOGIC: Grow Upwards
+    // We want the bottom-left corner to stay roughly in place
+    // So if height increases, Y must decrease.
+
+    try {
+        const currentPos = await appWindow.outerPosition();
+        const currentSize = await appWindow.outerSize();
+
+        console.log(`[Resize] Current: ${currentPos.x},${currentPos.y} Size: ${currentSize.width}x${currentSize.height}`);
+        console.log(`[Resize] Target Size: ${targetWidth}x${targetHeight}`);
+
+        // Calculate bottom edge Y coordinate
+        const bottomY = currentPos.y + currentSize.height;
+
+        // New Y = Bottom Y - New Height
+        const newY = bottomY - targetHeight;
+
+        console.log(`[Resize] Moving to Y: ${newY} (Shift: ${newY - currentPos.y})`);
+
+        // Move first to avoid "growing down" then "snapping up"
+        await appWindow.setPosition(new LogicalPosition(currentPos.x, newY));
+        await appWindow.setSize(new LogicalSize(targetWidth, targetHeight));
+
+    } catch (e) {
+        console.error("Failed to resize window:", e);
+    }
 }
 
 async function typeText(text: string) {
@@ -165,9 +201,8 @@ export function activateChat() {
 
 export function showChatInput() {
     chatInputContainer.classList.remove('hidden');
-    // Enable window focus so keyboard input works
-    // Small delay needed for OS to process focusability change before we can focus the input
-    window.electronAPI.setWindowFocusable(true);
+    appWindow.setFocus();
+    appWindow.setIgnoreCursorEvents(false);
     setTimeout(() => {
         chatInput.focus();
         console.log('[Chat] Input focused after focusable delay');
@@ -183,8 +218,8 @@ export function hideChatInput() {
     chatInputContainer.classList.add('hidden');
     chatInput.value = '';
     clearIdleTimeout();
-    // Disable window focus so clicks pass through again
-    window.electronAPI.setWindowFocusable(false);
+    // In overlay mode, we don't "disable focus" explicitly, 
+    // interactions.ts handles the ignoreCursorEvents based on hover.
     updateWindowSize();
 }
 
@@ -205,7 +240,6 @@ function clearBubbleTimeout() {
 function dismissBubble() {
     clearBubbleTimeout();
     hideSpeechBubble();
-    // If we're just showing the bubble (idle state), shrink window
     if (chatInputContainer.classList.contains('hidden')) {
         updateWindowSize();
     }
@@ -217,17 +251,14 @@ function returnToIdle(message: string | null) {
     clearBubbleTimeout();
     if (message) {
         showSpeechBubble(message);
-        // Short timeout for system messages
         bubbleTimeout = setTimeout(hideSpeechBubble, 3000);
     }
     setState(CharacterState.IDLE);
 }
 
-// After AI response: Foxy goes idle, but bubble stays with dismiss option
 function goIdleKeepBubble() {
     setState(CharacterState.IDLE);
     clearBubbleTimeout();
-    // Set a long timeout for the bubble to auto-dismiss
     bubbleTimeout = setTimeout(() => {
         hideSpeechBubble();
         hideChatInput();
@@ -242,31 +273,27 @@ async function sendMessage() {
     chatInput.disabled = true;
     clearIdleTimeout();
 
-    // Lock window during AI response generation
     lockWindow();
 
     setState(CharacterState.LISTENING);
     showSpeechBubble('Hmm, let me think... 🤔', false);
 
     try {
-        const result = await window.electronAPI.sendMessage(message, state.config);
+        const result = await geminiService.generateResponse(message, state.config);
 
         if (result.error) {
             setState(CharacterState.TALKING);
             showSpeechBubble(`Oops! ${result.error} 😅`);
         } else {
             setState(CharacterState.TALKING);
-            await showSpeechBubble(result.response);
+            await showSpeechBubble(result.response || '');
         }
 
-        // Unlock window after response is fully displayed
         unlockWindow();
 
         chatInput.disabled = false;
         chatInput.focus();
 
-        // Foxy goes idle but bubble stays visible for reading
-        // User can dismiss with X button or it auto-hides after 60s
         goIdleKeepBubble();
 
     } catch (error) {
@@ -274,7 +301,6 @@ async function sendMessage() {
         setState(CharacterState.TALKING);
         showSpeechBubble("Something went wrong! 😵");
 
-        // Unlock window on error too
         unlockWindow();
 
         setTimeout(() => {
