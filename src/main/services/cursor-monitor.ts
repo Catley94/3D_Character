@@ -314,6 +314,13 @@ export class CursorMonitor {
         }
     }
 
+    private isDragMode = false;
+
+    setDragMode(enabled: boolean) {
+        this.isDragMode = enabled;
+        console.log(`[CursorMonitor] Drag Mode set to: ${enabled}`);
+    }
+
     private checkCursor() {
         const win = windowManager.getMainWindow();
         if (!win || win.isDestroyed()) return;
@@ -330,7 +337,7 @@ export class CursorMonitor {
             this.lastLog = now;
             const source = (this.isWayland && this.helperReady) ? 'Helper' : 'Electron';
             try {
-                console.log(`[CursorMonitor] Heartbeat: Cursor(${cursor.x},${cursor.y}) Interactive:${this.isOverInteractive} Source:${source}`);
+                console.log(`[CursorMonitor] Heartbeat: Cursor(${cursor.x},${cursor.y}) Interactive:${this.isOverInteractive} Drag:${this.isDragMode} Source:${source}`);
             } catch (e) {
                 console.log('[CursorMonitor] Heartbeat error', e);
             }
@@ -344,6 +351,14 @@ export class CursorMonitor {
 
             // Always stream cursor position to renderer (full screen mode)
             win.webContents.send('cursor-position', { x: localX, y: localY });
+
+            // Skip all ignore-mouse-event logic if in Drag Mode
+            // In Drag Mode, the window is fully interactive and opaque (handled by main.ts or just by NOT setting ignore here)
+            if (this.isDragMode) {
+                // Ensure we are interactive
+                win.setIgnoreMouseEvents(false);
+                return;
+            }
 
             // LINUX CLICK FIX: Main process controls setIgnoreMouseEvents
             // Periodically force re-enable when over interactive elements

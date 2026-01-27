@@ -74,6 +74,9 @@ function activateChat() {
 // Application Lifecycle
 // =============================================================================
 
+// State for Drag Mode
+let isDragMode = false;
+
 app.whenReady().then(() => {
   console.log('[Main] App ready, initializing...');
 
@@ -95,6 +98,34 @@ app.whenReady().then(() => {
   cursorMonitor.setShortcutCallback((name) => {
     if (name === 'toggle_chat') {
       activateChat();
+
+      // ... (inside callback) ...
+    } else if (name === 'toggle_drag') {
+      const win = windowManager.getMainWindow();
+      if (win) {
+        // Toggle drag mode state
+        isDragMode = !isDragMode;
+
+        // Apply state: 
+        // If Drag Mode is ON: IgnoreMouseEvents = FALSE (clickable/draggable)
+        // If Drag Mode is OFF: IgnoreMouseEvents = TRUE (ghost)
+        // CRITICAL: Tell cursorMonitor about this so it doesn't auto-reset it!
+        cursorMonitor.setDragMode(isDragMode);
+
+        win.setIgnoreMouseEvents(!isDragMode);
+
+        if (isDragMode) {
+          console.log('[Main] Drag Mode ENABLED - Window is clickable/moveable');
+          win.setAlwaysOnTop(true);
+          win.focus();
+        } else {
+          console.log('[Main] Drag Mode DISABLED - Window is ghost (click-through)');
+          win.setAlwaysOnTop(true);
+        }
+
+        // Notify renderer to show "Drag Mode" UI
+        win.webContents.send('toggle-drag-mode', isDragMode);
+      }
     }
   });
 

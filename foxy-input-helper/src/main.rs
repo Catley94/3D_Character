@@ -171,6 +171,16 @@ impl InputState {
             if meta_held && shift_held {
                 return Some("toggle_chat");
             }
+        } else if trigger_key == Key::KEY_D {
+            // Check if both Meta (left or right) and Shift (left or right) are held
+            let meta_held = self.is_modifier_held(Key::KEY_LEFTMETA)
+                || self.is_modifier_held(Key::KEY_RIGHTMETA);
+            let shift_held = self.is_modifier_held(Key::KEY_LEFTSHIFT)
+                || self.is_modifier_held(Key::KEY_RIGHTSHIFT);
+
+            if meta_held && shift_held {
+                return Some("toggle_drag");
+            }
         }
 
         None
@@ -249,19 +259,39 @@ fn discover_devices() -> Vec<OpenDevice> {
         // Determine what type of device this is based on its capabilities
         let device_type = classify_device(&device);
 
-        if let Some(dtype) = device_type {
-            let path_str = path.to_string_lossy().to_string();
-            eprintln!(
-                "[foxy-input-helper] Found {:?}: {} ({})",
-                dtype,
-                device.name().unwrap_or("Unknown"),
-                path_str
-            );
-            devices.push(OpenDevice {
-                device,
-                device_type: dtype,
-                path: path_str,
-            });
+        // DEBUG: Log everything we find
+        let path_str = path.to_string_lossy().to_string();
+        let name = device.name().unwrap_or("Unknown").to_string();
+
+        match device_type {
+            Some(dtype) => {
+                eprintln!(
+                    "[foxy-input-helper] ACCEPTED {:?}: {} ({})",
+                    dtype, name, path_str
+                );
+                devices.push(OpenDevice {
+                    device,
+                    device_type: dtype,
+                    path: path_str,
+                });
+            }
+            None => {
+                // Check why it was rejected
+                let supported = device.supported_keys();
+                let rel_axes = device.supported_relative_axes();
+                let abs_axes = device.supported_absolute_axes();
+
+                eprintln!("[foxy-input-helper] SKIPPED: {} ({})", name, path_str);
+                if let Some(rel) = rel_axes {
+                    eprintln!("  -> Rel Axes: {:?}", rel);
+                }
+                if let Some(abs) = abs_axes {
+                    eprintln!("  -> Abs Axes: {:?}", abs);
+                }
+                if supported.is_none() && rel_axes.is_none() && abs_axes.is_none() {
+                    eprintln!("  -> No capabilities detected");
+                }
+            }
         }
     }
 
@@ -346,11 +376,15 @@ fn process_device_events(
     let mut total_dy = 0i32;
 
     for event in events {
+        // DEBUG: Print all events to understand what the device is doing
+        eprintln!("RAW EVENT: {:?}", event);
+
         match event.kind() {
             // -----------------------------------------------------------------
             // Relative axis events (mouse movement)
             // -----------------------------------------------------------------
             InputEventKind::RelAxis(axis) => {
+                eprintln!("REL EVENT: {:?} val={}", axis, event.value());
                 match axis {
                     RelativeAxisType::REL_X => {
                         // Horizontal mouse movement
@@ -364,6 +398,10 @@ fn process_device_events(
                         // Other axes like scroll wheel - we ignore for now
                     }
                 }
+            }
+            InputEventKind::AbsAxis(_axis) => {
+                // DEBUG: Log absolute events too, just in case
+                eprintln!("ABS EVENT: {:?} val={}", _axis, event.value());
             }
 
             // -----------------------------------------------------------------
@@ -433,6 +471,7 @@ fn process_device_events(
                 // Check for keyboard shortcuts (only on key press, not release)
                 if is_pressed && !is_modifier {
                     if let Some(shortcut_name) = state.check_shortcut(key) {
+                        eprintln!("[foxy-input-helper] Shortcut detected: {}", shortcut_name);
                         send_event(
                             stdout,
                             &OutputEvent::Shortcut {
@@ -608,72 +647,122 @@ fn main() {
     // -------------------------------------------------------------------------
     // Initialize state and output
     // -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Open /dev/input/mice for aggregated relative motion (handles touchpads too)
+    // -------------------------------------------------------------------------
+    // We store it as Option<File> so we can easily check existence and borrow mutably
+    let mut mice_file: Option<std::fs::File> = match std::fs::File::open("/dev/input/mice") {
+        Ok(f) => {
+            eprintln!("[foxy-input-helper] Successfully opened /dev/input/mice");
+            Some(f)
+        }
+        Err(e) => {
+            eprintln!(
+                "[foxy-input-helper] WARNING: Could not open /dev/input/mice: {}",
+                e
+            );
+            eprintln!("[foxy-input-helper] Cursor tracking might not work for touchpads.");
+            None
+        }
+    };
+    let has_mice_file = mice_file.is_some();
+
+    // -------------------------------------------------------------------------
+    // Initialize state and output
+    // -------------------------------------------------------------------------
     let mut state = InputState::new(screen_width, screen_height);
     let stdout = io::stdout();
     let mut stdout_lock = stdout.lock();
 
-    // Send ready message to Electron
+    // Send ready message
     send_event(
         &mut stdout_lock,
         &OutputEvent::Ready {
-            mice_count,
+            mice_count: if has_mice_file { 1 } else { 0 },
             keyboards_count,
             screen_width,
             screen_height,
         },
     );
 
-    // -------------------------------------------------------------------------
-    // Main event loop
-    // -------------------------------------------------------------------------
-    // We use poll() to wait for events from any of our devices.
-    // This is more efficient than busy-waiting or using threads.
-
     eprintln!("[foxy-input-helper] Starting event loop...");
 
     while running.load(Ordering::Relaxed) {
-        // Build list of file descriptors to poll
-        // poll() will block until one of them has data available
-        // Note: nix 0.29 requires BorrowedFd; evdev Device implements AsRawFd,
-        // so we use unsafe borrow_raw to create the BorrowedFd
-        let mut poll_fds: Vec<PollFd> = devices
-            .iter()
-            .map(|d| {
-                // SAFETY: The device is owned by us and will outlive this poll call.
-                // The raw fd is valid for the lifetime of the device.
-                let borrowed = unsafe { BorrowedFd::borrow_raw(d.device.as_raw_fd()) };
-                PollFd::new(borrowed, PollFlags::POLLIN)
-            })
-            .collect();
+        let mut poll_fds = Vec::new();
 
-        // Wait for events (timeout after 1000ms to check for shutdown signal)
-        // The timeout also lets us send periodic heartbeats
+        // 1. Add evdev devices (Keyboards + specific mice)
+        for d in &devices {
+            // SAFETY: devices owned by us
+            let borrowed = unsafe { BorrowedFd::borrow_raw(d.device.as_raw_fd()) };
+            poll_fds.push(PollFd::new(borrowed, PollFlags::POLLIN));
+        }
+
+        // 2. Add /dev/input/mice if available
+        if let Some(ref f) = mice_file {
+            let borrowed = unsafe { BorrowedFd::borrow_raw(f.as_raw_fd()) };
+            poll_fds.push(PollFd::new(borrowed, PollFlags::POLLIN));
+        }
+
+        // Wait for events
         match poll(&mut poll_fds, nix::poll::PollTimeout::from(1000u16)) {
             Ok(n) if n > 0 => {
-                // DEBUG: Log that poll returned
-                eprintln!("[foxy-input-helper] Poll returned {} events", n);
-
-                // At least one device has events ready
-                for (i, poll_fd) in poll_fds.iter().enumerate() {
-                    // Check if this device has events
-                    if let Some(revents) = poll_fd.revents() {
+                // Check normal evdev devices
+                for (i, d) in devices.iter_mut().enumerate() {
+                    if let Some(revents) = poll_fds[i].revents() {
                         if revents.contains(PollFlags::POLLIN) {
-                            eprintln!("[foxy-input-helper] Device {} has POLLIN", i);
-                            process_device_events(&mut devices[i], &mut state, &mut stdout_lock);
+                            process_device_events(d, &mut state, &mut stdout_lock);
+                        }
+                    }
+                }
+
+                // Check /dev/input/mice (last defined FD)
+                if has_mice_file {
+                    let mice_fd_idx = poll_fds.len() - 1;
+                    if let Some(revents) = poll_fds[mice_fd_idx].revents() {
+                        if revents.contains(PollFlags::POLLIN) {
+                            // Read 3-byte PS/2 packet
+                            // Byte 0: Yovfl Xovfl Ysign Xsign 1 Mid Right Left
+                            // Byte 1: X movement
+                            // Byte 2: Y movement
+                            let mut buf = [0u8; 3];
+                            if let Some(ref mut f) = mice_file {
+                                use std::io::Read;
+                                if let Ok(3) = f.read(&mut buf) {
+                                    // Parse X (byte 1)
+                                    let rel_x = buf[1] as i8 as i32;
+                                    // Parse Y (byte 2) - Standard PS/2: Y increases upwards.
+                                    // Screen Y increases downwards. So we typically negate Y.
+                                    let rel_y = -(buf[2] as i8 as i32);
+
+                                    // Update cursor
+                                    if state.update_cursor(rel_x, rel_y) {
+                                        send_event(
+                                            &mut stdout_lock,
+                                            &OutputEvent::Cursor {
+                                                x: state.cursor_x,
+                                                y: state.cursor_y,
+                                            },
+                                        );
+                                    }
+
+                                    // Handle clicks from Byte 0
+                                    // Bit 0: Left, Bit 1: Right, Bit 2: Middle
+                                    let _left = (buf[0] & 0x1) != 0;
+                                    let _right = (buf[0] & 0x2) != 0;
+                                    let _middle = (buf[0] & 0x4) != 0;
+                                }
+                            }
                         }
                     }
                 }
             }
             Ok(_) => {
-                // Timeout - send heartbeat so Electron knows we're alive
                 send_event(&mut stdout_lock, &OutputEvent::Heartbeat);
             }
-            Err(e) => {
-                // EINTR is normal (signal interrupted the syscall)
-                if e != nix::errno::Errno::EINTR {
-                    eprintln!("[foxy-input-helper] Poll error: {}", e);
-                }
+            Err(e) if e != nix::errno::Errno::EINTR => {
+                eprintln!("[foxy-input-helper] Poll error: {}", e);
             }
+            _ => {}
         }
     }
 

@@ -1386,6 +1386,11 @@ class CursorMonitor {
       return { x: cursor.x, y: cursor.y };
     }
   }
+  isDragMode = false;
+  setDragMode(enabled) {
+    this.isDragMode = enabled;
+    console.log(`[CursorMonitor] Drag Mode set to: ${enabled}`);
+  }
   checkCursor() {
     const win = windowManager.getMainWindow();
     if (!win || win.isDestroyed()) return;
@@ -1396,7 +1401,7 @@ class CursorMonitor {
       this.lastLog = now;
       const source = this.isWayland && this.helperReady ? "Helper" : "Electron";
       try {
-        console.log(`[CursorMonitor] Heartbeat: Cursor(${cursor.x},${cursor.y}) Interactive:${this.isOverInteractive} Source:${source}`);
+        console.log(`[CursorMonitor] Heartbeat: Cursor(${cursor.x},${cursor.y}) Interactive:${this.isOverInteractive} Drag:${this.isDragMode} Source:${source}`);
       } catch (e) {
         console.log("[CursorMonitor] Heartbeat error", e);
       }
@@ -1405,6 +1410,10 @@ class CursorMonitor {
       const localX = cursor.x - bounds.x;
       const localY = cursor.y - bounds.y;
       win.webContents.send("cursor-position", { x: localX, y: localY });
+      if (this.isDragMode) {
+        win.setIgnoreMouseEvents(false);
+        return;
+      }
       if (this.isOverInteractive) {
         if (now - this.lastForceReset > this.FORCE_RESET_INTERVAL) {
           this.lastForceReset = now;
@@ -1534,6 +1543,7 @@ function activateChat() {
     console.log("[Main] Activating Chat");
   }
 }
+let isDragMode = false;
 electron.app.whenReady().then(() => {
   console.log("[Main] App ready, initializing...");
   windowManager.createMainWindow();
@@ -1543,6 +1553,22 @@ electron.app.whenReady().then(() => {
   cursorMonitor.setShortcutCallback((name) => {
     if (name === "toggle_chat") {
       activateChat();
+    } else if (name === "toggle_drag") {
+      const win = windowManager.getMainWindow();
+      if (win) {
+        isDragMode = !isDragMode;
+        cursorMonitor.setDragMode(isDragMode);
+        win.setIgnoreMouseEvents(!isDragMode);
+        if (isDragMode) {
+          console.log("[Main] Drag Mode ENABLED - Window is clickable/moveable");
+          win.setAlwaysOnTop(true);
+          win.focus();
+        } else {
+          console.log("[Main] Drag Mode DISABLED - Window is ghost (click-through)");
+          win.setAlwaysOnTop(true);
+        }
+        win.webContents.send("toggle-drag-mode", isDragMode);
+      }
     }
   });
   try {
