@@ -11,28 +11,46 @@ A cute, interactive AI companion that lives on your desktop. Foxy (or your custo
 - **Customizable**: Change themes, names, and personality traits.
 
 ## 🛠️ Usage
+    
+### Prerequisites
+- **Linux Users**: You must be in the `input` group to allow the helper to read mouse events.
+    ```bash
+    sudo usermod -a -G input $USER
+    # You must LOG OUT and LOG IN again for this to take effect!
+    ```
+
+### Shortcuts
+- **`Meta + Shift + F`** (Super+Shift+F): **Toggle Chat**. Show/Hide the chat window.
+- **`Meta + Shift + D`** (Super+Shift+D): **Toggle Drag Mode**. 
+    - **ON**: Window becomes opaque and clickable everywhere. You can drag Foxy to a new spot.
+    - **OFF**: Window becomes "ghostly" again (clicks pass through except on Foxy).
 
 1.  **Install Dependencies**:
     ```bash
     npm install
     ```
-## 🐧 Linux / Wayland Compatibility Note
 
-To achieve the "Click-Through" transparency effect on Linux (specifically Wayland and some X11 compositors), this app uses a specific **Polling Strategy** ("The Radar").
+3.  **Run in Dev Mode**:
+    ```bash
+    npm run dev
+    ```
+    *(Note: This automatically builds and spawns the Rust input helper)*
+## 🐧 Linux / Wayland Compatibility
+
+To achieve the "Click-Through" transparency effect and global cursor tracking on Wayland, this app uses a custom Rust helper binary.
 
 ### The Problem
-Standard Electron `setIgnoreMouseEvents(true, { forward: true })` is unreliable on Linux.
-- The browser often thinks the mouse "Left the Window" immediately when transparency is enabled.
-- Mouse events stop firing, making it impossible to "wake up" the window when the user hovers back over the character.
+- **Wayland Security**: Apps cannot see the global cursor position or detect shortcuts when they are not focused.
+- **Click-Through**: Electron's `setIgnoreMouseEvents` is reliable for click-through, but we need to know *when* to disable it (i.e., when the mouse is over Foxy).
 
-### The Solution: "Radar" Polling
-We implement a manual mouse tracker in `interactions.ts` that:
-1.  Polls the Global Cursor Position via IPC (`getCursorScreenPoint`) every 100ms.
-2.  Polls the Window Bounds via IPC.
-3.  Calculates if the mouse is visually inside the Character's bounding box.
-4.  Manually toggles `setIgnoreMouseEvents(false)` (Capture) or `true` (Pass-Through).
+### The Solution: `foxy-input-helper`
+We built a small Rust binary (`/foxy-input-helper`) that:
+1.  Reads raw input events from `/dev/input/event*` and `/dev/input/mice`.
+2.  Tracks the **Global Cursor Position** (even on Wayland!).
+3.  Detects global **Shortcuts** (`Meta+Shift+F`, `Meta+Shift+D`).
+4.  Streams this data to the Electron app via JSON.
 
-**Note:** This polling is lightweight but essential for Linux functionality.
+This allows Foxy to look at your cursor and react to you, no matter what window you are using! 🚀
 
 ## 🛠️ Development Mode**:
     ```bash
