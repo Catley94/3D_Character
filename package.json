@@ -4,8 +4,9 @@
   "description": "A cute AI companion that floats on your desktop",
   "main": "dist-electron/main.js",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "build:helper": "cd foxy-input-helper && cargo build --release",
+    "dev": "npm run build:helper && vite",
+    "build": "npm run build:helper && tsc && vite build",
     "preview": "vite preview",
     "build:linux": "npm run build && electron-builder --linux",
     "build:mac": "npm run build && electron-builder --mac",
@@ -39,6 +40,12 @@
     "directories": {
       "output": "release"
     },
+    "extraResources": [
+      {
+        "from": "foxy-input-helper/target/release/foxy-input-helper",
+        "to": "foxy-input-helper"
+      }
+    ],
     "files": [
       "dist/**/*",
       "dist-electron/**/*",

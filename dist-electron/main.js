@@ -2,6 +2,25 @@
 const electron = require("electron");
 const path = require("path");
 const fs = require("fs");
+const child_process = require("child_process");
+function _interopNamespaceDefault(e) {
+  const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
+  if (e) {
+    for (const k in e) {
+      if (k !== "default") {
+        const d = Object.getOwnPropertyDescriptor(e, k);
+        Object.defineProperty(n, k, d.get ? d : {
+          enumerable: true,
+          get: () => e[k]
+        });
+      }
+    }
+  }
+  n.default = e;
+  return Object.freeze(n);
+}
+const path__namespace = /* @__PURE__ */ _interopNamespaceDefault(path);
+const fs__namespace = /* @__PURE__ */ _interopNamespaceDefault(fs);
 class WindowManager {
   mainWindow = null;
   MIN_WIDTH = 200;
@@ -1161,6 +1180,14 @@ class ConfigService {
   }
 }
 const configService = new ConfigService();
+function detectSessionType$1() {
+  const sessionType2 = process.env.XDG_SESSION_TYPE?.toLowerCase();
+  if (sessionType2 === "wayland") return "wayland";
+  if (sessionType2 === "x11") return "x11";
+  if (process.env.WAYLAND_DISPLAY) return "wayland";
+  if (process.platform === "linux") return "x11";
+  return "unknown";
+}
 class CursorMonitor {
   intervalId = null;
   lastCursorInBounds = false;
@@ -1172,7 +1199,27 @@ class CursorMonitor {
   isOverInteractive = false;
   lastForceReset = 0;
   FORCE_RESET_INTERVAL = 200;
-  // ms - periodically force re-enable
+  // ms
+  // Wayland support: Rust helper process
+  helperProcess = null;
+  helperCursorX = 0;
+  helperCursorY = 0;
+  isWayland = false;
+  helperReady = false;
+  // Callback for shortcut events
+  onShortcut = null;
+  constructor() {
+    const sessionType2 = detectSessionType$1();
+    this.isWayland = sessionType2 === "wayland";
+    console.log(`[CursorMonitor] Session type: ${sessionType2}`);
+  }
+  /**
+   * Set a callback for when keyboard shortcuts are detected by the helper.
+   * This works globally on Wayland, unlike Electron's globalShortcut.
+   */
+  setShortcutCallback(callback) {
+    this.onShortcut = callback;
+  }
   setSyntheticEventsEnabled(enabled) {
     this.syntheticEventsEnabled = enabled;
     console.log(`[CursorMonitor] Synthetic events ${enabled ? "ENABLED" : "DISABLED"}`);
@@ -1181,9 +1228,16 @@ class CursorMonitor {
   setOverInteractive(isInteractive) {
     this.isOverInteractive = isInteractive;
   }
+  /**
+   * Start the cursor monitor.
+   * On Wayland, this also spawns the Rust helper for input tracking.
+   */
   start() {
     if (this.intervalId) return;
-    console.log("[CursorMonitor] Starting main-process polling (Full Screen Mode)...");
+    console.log("[CursorMonitor] Starting main-process polling...");
+    if (this.isWayland) {
+      this.startHelper();
+    }
     this.intervalId = setInterval(() => {
       this.checkCursor();
     }, this.POLL_INTERVAL);
@@ -1194,21 +1248,155 @@ class CursorMonitor {
       this.intervalId = null;
       console.log("[CursorMonitor] Stopped polling");
     }
+    this.stopHelper();
+  }
+  // =========================================================================
+  // Rust Helper Management
+  // =========================================================================
+  /**
+   * Find the path to the Rust helper binary.
+   * Checks multiple locations: dev build, packaged app, etc.
+   */
+  findHelperPath() {
+    const possiblePaths = [
+      // Development: built in the project directory
+      path__namespace.join(electron.app.getAppPath(), "foxy-input-helper", "target", "release", "foxy-input-helper"),
+      // Development: relative to dist-electron
+      path__namespace.join(electron.app.getAppPath(), "..", "foxy-input-helper", "target", "release", "foxy-input-helper"),
+      // Packaged: in resources directory
+      path__namespace.join(process.resourcesPath, "foxy-input-helper"),
+      // Packaged: alongside the app
+      path__namespace.join(path__namespace.dirname(electron.app.getPath("exe")), "foxy-input-helper")
+    ];
+    for (const p of possiblePaths) {
+      console.log(`[CursorMonitor] Checking for helper at: ${p}`);
+      if (fs__namespace.existsSync(p)) {
+        console.log(`[CursorMonitor] Found helper at: ${p}`);
+        return p;
+      }
+    }
+    console.warn("[CursorMonitor] Rust helper not found in any expected location");
+    return null;
+  }
+  /**
+   * Start the Rust helper process.
+   * The helper reads from /dev/input and streams JSON events to stdout.
+   */
+  startHelper() {
+    if (this.helperProcess) return;
+    const helperPath = this.findHelperPath();
+    if (!helperPath) {
+      console.warn("[CursorMonitor] Cannot start helper: binary not found");
+      console.warn("[CursorMonitor] Falling back to Electron cursor API (may not work on Wayland)");
+      return;
+    }
+    console.log("[CursorMonitor] Starting Rust input helper...");
+    try {
+      this.helperProcess = child_process.spawn(helperPath, [], {
+        stdio: ["ignore", "pipe", "pipe"]
+      });
+      if (this.helperProcess.stdout) {
+        const readline2 = require("readline");
+        const rl = readline2.createInterface({
+          input: this.helperProcess.stdout,
+          crlfDelay: Infinity
+        });
+        rl.on("line", (line) => {
+          console.log(`[CursorMonitor] RAW: ${line}`);
+          this.handleHelperEvent(line);
+        });
+      }
+      if (this.helperProcess.stderr) {
+        this.helperProcess.stderr.on("data", (data) => {
+          console.log(`[Helper] ${data.toString().trim()}`);
+        });
+      }
+      this.helperProcess.on("exit", (code, signal) => {
+        console.log(`[CursorMonitor] Helper exited: code=${code}, signal=${signal}`);
+        this.helperProcess = null;
+        this.helperReady = false;
+      });
+      this.helperProcess.on("error", (err) => {
+        console.error("[CursorMonitor] Helper error:", err);
+        this.helperProcess = null;
+        this.helperReady = false;
+      });
+    } catch (err) {
+      console.error("[CursorMonitor] Failed to start helper:", err);
+    }
+  }
+  /**
+   * Stop the Rust helper process.
+   */
+  stopHelper() {
+    if (this.helperProcess) {
+      console.log("[CursorMonitor] Stopping Rust helper...");
+      this.helperProcess.kill("SIGTERM");
+      this.helperProcess = null;
+      this.helperReady = false;
+    }
+  }
+  /**
+   * Handle a JSON event from the Rust helper.
+   */
+  handleHelperEvent(line) {
+    try {
+      const event = JSON.parse(line);
+      switch (event.type) {
+        case "ready":
+          console.log(`[CursorMonitor] Helper ready: ${event.mice_count} mice, ${event.keyboards_count} keyboards`);
+          this.helperReady = true;
+          break;
+        case "cursor":
+          if (event.x !== void 0 && event.y !== void 0) {
+            this.helperCursorX = event.x;
+            this.helperCursorY = event.y;
+          }
+          break;
+        case "shortcut":
+          if (event.name && this.onShortcut) {
+            console.log(`[CursorMonitor] Shortcut detected: ${event.name}`);
+            this.onShortcut(event.name);
+          }
+          break;
+        case "click":
+          break;
+        case "heartbeat":
+          break;
+        case "error":
+          console.warn(`[CursorMonitor] Helper error: ${event.message}`);
+          break;
+      }
+    } catch (err) {
+    }
+  }
+  // =========================================================================
+  // Cursor Position Tracking
+  // =========================================================================
+  /**
+   * Get the current cursor position.
+   * On Wayland with helper running, uses helper's tracked position.
+   * Otherwise, falls back to Electron's screen API.
+   */
+  getCursorPosition() {
+    if (this.isWayland && this.helperReady) {
+      return { x: this.helperCursorX, y: this.helperCursorY };
+    } else {
+      const cursor = electron.screen.getCursorScreenPoint();
+      return { x: cursor.x, y: cursor.y };
+    }
   }
   checkCursor() {
     const win = windowManager.getMainWindow();
     if (!win || win.isDestroyed()) return;
     const bounds = win.getBounds();
-    const rawCursor = electron.screen.getCursorScreenPoint();
-    const cursor = {
-      x: rawCursor.x,
-      y: rawCursor.y
-    };
+    const cursor = this.getCursorPosition();
     const now = Date.now();
     if (now - this.lastLog > 2e3) {
       this.lastLog = now;
+      const source = this.isWayland && this.helperReady ? "Helper" : "Electron";
       try {
-        console.log(`[CursorMonitor] Heartbeat: Cursor(${cursor.x},${cursor.y}) Interactive:${this.isOverInteractive}`);
+        console.log(`[CursorMonitor] Heartbeat: Cursor(${cursor.x},${cursor.y}) Interactive:${this.isOverInteractive} Source:${source}`);
       } catch (e) {
         console.log("[CursorMonitor] Heartbeat error", e);
       }
@@ -1325,24 +1513,50 @@ function registerIpcHandlers() {
     cursorMonitor.setOverInteractive(isInteractive);
   });
 }
-electron.app.commandLine.appendSwitch("ozone-platform-hint", "x11");
+function detectSessionType() {
+  const sessionType2 = process.env.XDG_SESSION_TYPE?.toLowerCase();
+  if (sessionType2 === "wayland") return "wayland";
+  if (sessionType2 === "x11") return "x11";
+  if (process.env.WAYLAND_DISPLAY) return "wayland";
+  if (process.platform === "linux") return "x11";
+  return "unknown";
+}
+const sessionType = detectSessionType();
+console.log(`[Main] Detected session type: ${sessionType}`);
+function activateChat() {
+  const win = windowManager.getMainWindow();
+  if (win) {
+    win.show();
+    win.setAlwaysOnTop(true);
+    win.setIgnoreMouseEvents(false);
+    win.focus();
+    win.webContents.send("activate-chat");
+    console.log("[Main] Activating Chat");
+  }
+}
 electron.app.whenReady().then(() => {
+  console.log("[Main] App ready, initializing...");
   windowManager.createMainWindow();
   setTimeout(() => trayManager.createTray(), 500);
   registerIpcHandlers();
   cursorMonitor.start();
-  const { globalShortcut } = require("electron");
-  globalShortcut.register("Meta+Shift+F", () => {
-    const win = windowManager.getMainWindow();
-    if (win) {
-      win.show();
-      win.setAlwaysOnTop(true);
-      win.setIgnoreMouseEvents(false);
-      win.focus();
-      win.webContents.send("activate-chat");
-      console.log("[Main] Global Shortcut triggered: Activating Chat");
+  cursorMonitor.setShortcutCallback((name) => {
+    if (name === "toggle_chat") {
+      activateChat();
     }
   });
+  try {
+    const registered = electron.globalShortcut.register("Meta+Shift+F", () => {
+      activateChat();
+    });
+    if (registered) {
+      console.log("[Main] Global shortcut Meta+Shift+F registered (Electron)");
+    } else {
+      console.warn("[Main] Global shortcut registration failed (Wayland?)");
+    }
+  } catch (err) {
+    console.warn("[Main] Could not register global shortcut:", err);
+  }
   electron.app.on("activate", () => {
     windowManager.createMainWindow();
   });
@@ -1350,6 +1564,11 @@ electron.app.whenReady().then(() => {
 electron.app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     cursorMonitor.stop();
+    electron.globalShortcut.unregisterAll();
     electron.app.quit();
   }
+});
+electron.app.on("will-quit", () => {
+  electron.globalShortcut.unregisterAll();
+  cursorMonitor.stop();
 });
