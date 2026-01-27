@@ -37,8 +37,8 @@ class WindowManager {
       skipTaskbar: true,
       resizable: false,
       hasShadow: false,
-      focusable: false,
-      // Critical for Linux click-through - prevents focus stealing
+      focusable: true,
+      // Keep focusable so text input works - click-through handled by setIgnoreMouseEvents
       webPreferences: {
         preload: this.getPreloadPath(),
         nodeIntegration: false,
@@ -1270,6 +1270,16 @@ function registerIpcHandlers() {
     const win = windowManager.getMainWindow();
     if (win) {
       win.setMovable(!locked);
+    }
+  });
+  electron.ipcMain.on("set-window-focusable", (event, focusable) => {
+    const win = windowManager.getMainWindow();
+    if (win) {
+      win.setFocusable(focusable);
+      if (focusable) {
+        win.focus();
+      }
+      console.log(`[IPC] Window focusable: ${focusable}`);
     }
   });
   electron.ipcMain.on("set-window-position", (event, { x, y, width, height }) => {

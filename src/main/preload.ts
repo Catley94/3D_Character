@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setWindowPosition: (x: number, y: number, width: number, height: number) => ipcRenderer.send('set-window-position', { x, y, width, height }),
     setWindowSize: (width: number, height: number) => ipcRenderer.send('set-window-size', { width, height }),
     setWindowLocked: (locked: boolean) => ipcRenderer.send('set-window-locked', locked),
+    setWindowFocusable: (focusable: boolean) => ipcRenderer.send('set-window-focusable', focusable),
 
     // Click-through control
     setIgnoreMouseEvents: (ignore: boolean, options?: any) => ipcRenderer.send('set-ignore-mouse-events', ignore, options),

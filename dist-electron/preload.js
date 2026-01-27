@@ -7,6 +7,7 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
   setWindowPosition: (x, y, width, height) => electron.ipcRenderer.send("set-window-position", { x, y, width, height }),
   setWindowSize: (width, height) => electron.ipcRenderer.send("set-window-size", { width, height }),
   setWindowLocked: (locked) => electron.ipcRenderer.send("set-window-locked", locked),
+  setWindowFocusable: (focusable) => electron.ipcRenderer.send("set-window-focusable", focusable),
   // Click-through control
   setIgnoreMouseEvents: (ignore, options) => electron.ipcRenderer.send("set-ignore-mouse-events", ignore, options),
   setWindowShape: (rects) => electron.ipcRenderer.send("set-window-shape", rects),

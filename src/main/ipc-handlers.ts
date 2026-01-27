@@ -47,6 +47,20 @@ export function registerIpcHandlers() {
         }
     });
 
+    // Toggle window focusability - needed for text input to work
+    // Window starts unfocusable for click-through, but needs focus for typing
+    ipcMain.on('set-window-focusable', (event, focusable: boolean) => {
+        const win = windowManager.getMainWindow();
+        if (win) {
+            win.setFocusable(focusable);
+            if (focusable) {
+                // When making focusable, also bring to front and focus
+                win.focus();
+            }
+            console.log(`[IPC] Window focusable: ${focusable}`);
+        }
+    });
+
     ipcMain.on('set-window-position', (event, { x, y, width, height }) => {
         const win = windowManager.getMainWindow();
         if (win) {

@@ -34,6 +34,16 @@ export function initChat() {
         dismissBubble();
     });
 
+    // Ensure window is focusable when user clicks/focuses the input
+    chatInput.addEventListener('click', () => {
+        window.electronAPI.setWindowFocusable(true);
+        setTimeout(() => chatInput.focus(), 50);
+    });
+
+    chatInput.addEventListener('focus', () => {
+        console.log('[Chat] Input received focus event');
+    });
+
     // Reset idle timeout while typing
     chatInput.addEventListener('input', () => {
         if (idleTimeout) {
@@ -145,7 +155,13 @@ export function activateChat() {
 
 export function showChatInput() {
     chatInputContainer.classList.remove('hidden');
-    chatInput.focus();
+    // Enable window focus so keyboard input works
+    // Small delay needed for OS to process focusability change before we can focus the input
+    window.electronAPI.setWindowFocusable(true);
+    setTimeout(() => {
+        chatInput.focus();
+        console.log('[Chat] Input focused after focusable delay');
+    }, 100);
     updateWindowSize();
     clearIdleTimeout();
     idleTimeout = setTimeout(() => {
@@ -157,6 +173,8 @@ export function hideChatInput() {
     chatInputContainer.classList.add('hidden');
     chatInput.value = '';
     clearIdleTimeout();
+    // Disable window focus so clicks pass through again
+    window.electronAPI.setWindowFocusable(false);
     updateWindowSize();
 }
 

@@ -43,7 +43,7 @@ export class WindowManager {
             skipTaskbar: true,
             resizable: false,
             hasShadow: false,
-            focusable: false, // Critical for Linux click-through - prevents focus stealing
+            focusable: true, // Keep focusable so text input works - click-through handled by setIgnoreMouseEvents
             webPreferences: {
                 preload: this.getPreloadPath(),
                 nodeIntegration: false,

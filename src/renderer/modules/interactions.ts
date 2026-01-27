@@ -12,6 +12,8 @@ export function setupClickThrough() {
     const backpack = document.getElementById('backpack');
     const speechBubble = document.getElementById('speech-bubble');
     const chatInputContainer = document.getElementById('chat-input-container');
+    const chatInput = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-btn');
     const settingsPanel = document.getElementById('settings-panel');
     const dragHandle = document.getElementById('drag-handle');
     const closeBtn = document.getElementById('close-settings');
@@ -24,6 +26,8 @@ export function setupClickThrough() {
         { el: backpack, id: 'backpack' },
         { el: speechBubble, id: 'speech-bubble' },
         { el: chatInputContainer, id: 'chat-input-container' },
+        { el: chatInput, id: 'chat-input' },
+        { el: sendBtn, id: 'send-btn' },
         { el: dragHandle, id: 'drag-handle' },
         { el: closeBtn, id: 'close-settings' },
         { el: saveBtn, id: 'save-settings' }

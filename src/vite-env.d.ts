@@ -4,6 +4,7 @@ export interface ElectronAPI {
     setWindowPosition: (x: number, y: number, width: number, height: number) => void;
     setWindowSize: (width: number, height: number) => void;
     setWindowLocked: (locked: boolean) => void;
+    setWindowFocusable: (focusable: boolean) => void;
     setIgnoreMouseEvents: (ignore: boolean, options?: { forward: boolean }) => void;
     // setWindowShape: (rects: { x: number, y: number, width: number, height: number }[]) => void; // REMOVED
     getCursorScreenPoint: () => Promise<{ x: number, y: number }>;
