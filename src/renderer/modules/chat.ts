@@ -29,6 +29,16 @@ export function initChat() {
         if (e.key === 'Enter') sendMessage();
     });
 
+    // Prevent global shortcuts from typing characters
+    chatInput.addEventListener('keydown', (e) => {
+        // Meta+Shift+D (Drag Mode)
+        // Note: On some systems Meta is captured, but we check just in case it leaks through
+        if ((e.key.toLowerCase() === 'd') && e.shiftKey && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            console.log('[Chat] Prevented Drag Mode shortcut input');
+        }
+    });
+
     // Dismiss button handler
     bubbleDismiss.addEventListener('click', () => {
         dismissBubble();
