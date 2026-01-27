@@ -30,5 +30,6 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
   // Linux click fix: report when cursor is over interactive elements
   setOverInteractive: (isInteractive) => electron.ipcRenderer.send("set-over-interactive", isInteractive),
   // Activation
-  onActivateChat: (callback) => electron.ipcRenderer.on("activate-chat", callback)
+  onActivateChat: (callback) => electron.ipcRenderer.on("activate-chat", callback),
+  onToggleDragMode: (callback) => electron.ipcRenderer.on("toggle-drag-mode", (event, isDragMode) => callback(isDragMode))
 });

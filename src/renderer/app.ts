@@ -25,6 +25,17 @@ async function init() {
         activateChat();
     });
 
+    // Listen for Drag Mode Toggle (Visual Indicator)
+    window.electronAPI.onToggleDragMode((isDragMode) => {
+        if (isDragMode) {
+            document.body.classList.add('drag-mode-active');
+            console.log('[Renderer] Drag Mode ON');
+        } else {
+            document.body.classList.remove('drag-mode-active');
+            console.log('[Renderer] Drag Mode OFF');
+        }
+    });
+
     console.log('[Renderer] Ready!');
 }
 

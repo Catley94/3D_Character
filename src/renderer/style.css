@@ -511,3 +511,21 @@ body.debug-mode::before {
   border-radius: 3px;
   z-index: 9999;
 }
+
+/* ========================================= */
+/* Drag Mode Visual Indicator                */
+/* ========================================= */
+body.drag-mode-active #character-img {
+  /* Softer, singular glow to avoid "dirty alpha" edges or compositing artifacts */
+  filter: drop-shadow(0 0 20px rgb(179, 0, 255));
+  will-change: filter;
+  transition: filter 0.3s ease;
+}
+
+body.drag-mode-active #character {
+  cursor: grab;
+}
+
+body.drag-mode-active #character:active {
+  cursor: grabbing;
+}

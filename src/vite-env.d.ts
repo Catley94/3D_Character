@@ -17,6 +17,7 @@ export interface ElectronAPI {
     setDragging: (isDragging: boolean) => void;
     setOverInteractive: (isInteractive: boolean) => void; // Linux click fix
     onActivateChat: (callback: () => void) => void;
+    onToggleDragMode: (callback: (isDragMode: boolean) => void) => void;
 }
 
 declare global {

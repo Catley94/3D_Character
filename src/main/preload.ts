@@ -37,5 +37,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setOverInteractive: (isInteractive: boolean) => ipcRenderer.send('set-over-interactive', isInteractive),
 
     // Activation
-    onActivateChat: (callback: () => void) => ipcRenderer.on('activate-chat', callback)
+    onActivateChat: (callback: () => void) => ipcRenderer.on('activate-chat', callback),
+    onToggleDragMode: (callback: (isDragMode: boolean) => void) => ipcRenderer.on('toggle-drag-mode', (event, isDragMode) => callback(isDragMode))
 });
