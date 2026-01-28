@@ -1,5 +1,20 @@
 # 🦊 Foxy - Project Status & Roadmap
 
+## 🛠️ Infrastructure & Build (Development)
+
+### Technology Stack
+- **Framework**: Tauri v2 (Rust Backend + WebView Frontend).
+- **Frontend**: TypeScript, Vite.
+- **Input Handling**: Custom Rust binary (`foxy-input-helper`) for low-level input tracking.
+
+### Build Implementation
+- **Current Status**: Manual builds via `cargo tauri build`.
+- **Packaging**: Supports standard Tauri targets (Deb/AppImage for Linux).
+
+---
+
+## 🌟 Implemented Features
+
 ## 🌟 Implemented Features
 
 ### Core Character System
@@ -47,6 +62,12 @@
 ### 4. Expanded Content
 - [ ] **More Characters**: Add new themes (e.g., Robot, Cat, Wizard).
 - [ ] **Props**: Items the character can interact with (Backpack, Ball).
+
+### 5. Deployment & Release
+- [ ] **CI/CD Pipeline**: Automated GitHub Actions to build releases for all platforms on push.
+- [ ] **Auto-Update**: Functionality for the app to download and apply updates automatically.
+- [ ] **Signed Binaries**: Code signing for Windows/macOS to avoid security warnings.
+
 
 ---
 
