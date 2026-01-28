@@ -279,8 +279,9 @@ body.is-dragging #character {
 
 #bubble-tail {
   position: absolute;
-  top: -8px;
-  right: 30px;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -100%);
   width: 0;
   height: 0;
   border-left: 10px solid transparent;
