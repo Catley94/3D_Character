@@ -15,8 +15,6 @@
 
 ## 🌟 Implemented Features
 
-## 🌟 Implemented Features
-
 ### Core Character System
 - **Interactive Companion**: A 3D-style 2D character (default: Fox) resides on your screen.
 - **State Management**:
@@ -87,4 +85,4 @@
 
 ### Visual Polish
 - **Seasonal Themes**: Automatic hats or accessories based on date (Santa hat in Dec, Pumpkin in Oct).
-- **Shadows & Lighting**: Drop shadows that respect screen position for more depth.
+- **Shadows & Lighting**: Drop shadows that respect screen position for more depth. - **Done**
