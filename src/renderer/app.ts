@@ -5,6 +5,7 @@ import { setupClickThrough } from './modules/interactions';
 import { initCharacter } from './modules/character';
 import { initChat, activateChat } from './modules/chat';
 import { initSettings, applyConfig } from './modules/settings';
+import { initLighting } from './modules/lighting';
 
 async function init() {
     console.log('[Renderer] Initializing (Tauri)...');
@@ -24,6 +25,7 @@ async function init() {
     initCharacter();
     initChat();
     initSettings();
+    initLighting();
 
     // Apply config (updates UI, State, Theme)
     applyConfig(config);

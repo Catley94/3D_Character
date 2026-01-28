@@ -15,6 +15,12 @@
   --accent-hover: #ea580c;
   --settings-bg: rgba(30, 30, 40, 0.95);
   --settings-text: #f1f5f9;
+
+  /* Dynamic Shadow Defaults */
+  --shadow-x: 0px;
+  --shadow-y: 4px;
+  --shadow-blur: 8px;
+  --shadow-color: rgba(0, 0, 0, 0.3);
 }
 
 html,
@@ -99,7 +105,7 @@ body.is-dragging #character {
   height: 100%;
   object-fit: contain;
   pointer-events: none;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+  filter: drop-shadow(var(--shadow-x) var(--shadow-y) var(--shadow-blur) var(--shadow-color));
 }
 
 /* Character States */
