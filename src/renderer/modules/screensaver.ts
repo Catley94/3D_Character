@@ -1,5 +1,7 @@
 import { getCurrentWindow, LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize, currentMonitor } from '@tauri-apps/api/window';
-import { showSpeechBubble } from './chat';
+import { showSpeechBubble, hideSpeechBubble, hideChatInput } from './chat';
+import { setState } from './character';
+import { CharacterState } from './store';
 
 const appWindow = getCurrentWindow();
 let isScreensaverActive = false;
@@ -37,6 +39,18 @@ async function startScreensaver() {
         savedPosition = await appWindow.outerPosition();
         savedSize = await appWindow.outerSize();
 
+        console.log(`[Screensaver] Saved Pos: ${savedPosition.x}, ${savedPosition.y}`);
+
+        // Reset Character State (Stop talking/listening)
+        setState(CharacterState.IDLE);
+        hideSpeechBubble();
+        hideChatInput();
+
+        // 1. FADE OUT before resize
+        document.body.style.opacity = '0';
+        document.body.style.transition = 'opacity 0.2s ease';
+        await new Promise(r => setTimeout(r, 200));
+
         // Must be resizable to fullscreen
         await appWindow.setResizable(true);
 
@@ -59,19 +73,40 @@ async function startScreensaver() {
         // Ensure we capture all mouse events by disabling click-through
         await appWindow.setIgnoreCursorEvents(false);
 
-        // Start Wandering
-        startWanderLoop();
+        // 2. POSITION CHARACTER AT START (No Transition)
+        const char = document.getElementById('character');
+        if (char && savedPosition) {
+            // Temporarily disable transition
+            char.style.transition = 'none';
+            char.style.left = `${savedPosition.x}px`;
+            char.style.top = `${savedPosition.y}px`;
 
-        // Exit trigger (Click/Key/Mouse)
-        // We add a longer delay (1s) to avoid immediate exit from button click or jitter
+            // Force reflow
+            void char.offsetHeight;
+        }
+
+        // 3. FADE IN
+        document.body.style.opacity = '1';
+
+        // Wait for fade in, then enable smooth movement
         setTimeout(() => {
-            window.addEventListener('click', stopScreensaver, { once: true });
-            window.addEventListener('keydown', handleExitKey);
+            if (char) {
+                // Re-enable CSS transition (managed by class, so just clearing inline style works if class has it)
+                // But we set 'none' inline, so we must clear it.
+                char.style.transition = '';
+            }
 
-            // Capture current mouse pos to compare against for threshold
-            // We use the first mouse move event to set the reference
-            window.addEventListener('mousemove', handleMouseMoveExit);
-        }, 1000);
+            // Start Wandering after a moment
+            startWanderLoop();
+
+            // Exit trigger setup
+            setTimeout(() => {
+                window.addEventListener('click', stopScreensaver, { once: true });
+                window.addEventListener('keydown', handleExitKey);
+                window.addEventListener('mousemove', handleMouseMoveExit);
+            }, 1000); // 1s delay before exit allowed
+
+        }, 300);
 
         showSpeechBubble("Wander Mode Active! 🌙", false);
         setTimeout(() => {
@@ -82,6 +117,7 @@ async function startScreensaver() {
     } catch (e) {
         console.error("Failed to start screensaver:", e);
         isScreensaverActive = false;
+        document.body.style.opacity = '1';
     }
 }
 
@@ -89,6 +125,13 @@ async function stopScreensaver() {
     if (!isScreensaverActive) return;
     isScreensaverActive = false;
     console.log('[Screensaver] Stopping...');
+
+    // FADE OUT to hide resize glitches
+    document.body.style.opacity = '0';
+    document.body.style.transition = 'opacity 0.2s ease';
+
+    // Wait for fade out
+    await new Promise(r => setTimeout(r, 200));
 
     // Clean up listeners
     window.removeEventListener('click', stopScreensaver);
@@ -116,16 +159,47 @@ async function stopScreensaver() {
     try {
         await appWindow.setFullscreen(false);
         await appWindow.setResizable(false); // Restore non-resizable state
+        await appWindow.setIgnoreCursorEvents(false); // Enable events for windowed mode (standard behavior)
+
+        // Restore size/pos if we have them
         // Restore size/pos if we have them
         if (savedSize && savedPosition) {
-            // We can pass Physical types back to setSize/setPosition often, or convert if needed.
-            // But actually, setSize likely expects LogicalSize or PhysicalSize.
-            // Let's coerce to any to avoid strict TS issues for now as likely the API supports both or we rely on duck typing.
+            console.log(`[Screensaver] Restoring Pos: ${savedPosition.x}, ${savedPosition.y}`);
+
+            // Wait for OS window manager to process fullscreen exit (increased delay)
+            await new Promise(r => setTimeout(r, 300));
+
+            // First attempt
             await appWindow.setSize(savedSize as any);
             await appWindow.setPosition(savedPosition as any);
+
+            // Second attempt (safety net for some WMs)
+            setTimeout(async () => {
+                if (!isScreensaverActive && savedPosition) {
+                    await appWindow.setPosition(savedPosition as any);
+                }
+            }, 300);
+
+        } else {
+            // Fallback if no saved state
+            console.warn("[Screensaver] No saved state found, resetting to default.");
+            await appWindow.setSize(new LogicalSize(250, 250));
         }
+
+        // FADE IN after everything is settled
+        setTimeout(() => {
+            document.body.style.opacity = '1';
+            // Clean up inline styles after transition
+            setTimeout(() => {
+                document.body.style.transition = '';
+                document.body.style.opacity = '';
+            }, 300);
+        }, 300); // Wait a bit more for window resize to finish painting
+
     } catch (e) {
         console.error("Failed to restore window:", e);
+        // Ensure we are visible even if error
+        document.body.style.opacity = '1';
     }
 }
 
