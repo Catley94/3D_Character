@@ -57,9 +57,10 @@
   - Run in a hidden/tray mode.
   - Listen for a wake word (e.g., "Hey Foxy") to appear on screen.
 
-### 4. Expanded Content
-- [ ] **More Characters**: Add new themes (e.g., Robot, Cat, Wizard).
-- [ ] **Props**: Items the character can interact with (Backpack, Ball).
+### Future Improvements
+- [ ] **State Machine System**: Refactor character logic to use a formal state machine for better state management and transitions.
+- [ ] **More Character Models**: Add more diversity.
+- [ ] **Voice Interaction**: Text-to-speech and Speech-to-text.r can interact with (Backpack, Ball).
 
 ### 5. Deployment & Release
 - [ ] **CI/CD Pipeline**: Automated GitHub Actions to build releases for all platforms on push.
