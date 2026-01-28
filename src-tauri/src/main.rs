@@ -481,6 +481,7 @@ fn load_config(app_handle: AppHandle) -> serde_json::Value {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_log::Builder::default().build()) // Enable logging
         .invoke_handler(tauri::generate_handler![save_config, load_config]) // Register commands
         // .setup is where we initialize things when the app starts.

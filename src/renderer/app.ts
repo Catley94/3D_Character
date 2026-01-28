@@ -27,7 +27,7 @@ async function init() {
     initChat();
     initSettings();
     initLighting();
-    initScreensaver();
+    await initScreensaver();
 
     // Apply config (updates UI, State, Theme)
     applyConfig(config);

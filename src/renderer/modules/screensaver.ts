@@ -1,4 +1,5 @@
 import { getCurrentWindow, LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize, currentMonitor } from '@tauri-apps/api/window';
+import { register } from '@tauri-apps/plugin-global-shortcut';
 import { showSpeechBubble, hideSpeechBubble, hideChatInput } from './chat';
 import { setState } from './character';
 import { CharacterState } from './store';
@@ -10,15 +11,27 @@ let savedPosition: LogicalPosition | PhysicalPosition | null = null;
 let savedSize: LogicalSize | PhysicalSize | null = null;
 
 const CHARACTER_SIZE = 150; // Approximation
+const INACTIVITY_LIMIT = 20000; // 20 seconds
+let inactivityTimer: NodeJS.Timeout | null = null;
 
-export function initScreensaver() {
-    // Keyboard Shortcut: Ctrl + Alt + `
-    window.addEventListener('keydown', (e) => {
-        if (e.repeat) return;
-        if (e.ctrlKey && e.altKey && e.key === '`') {
-            toggleScreensaver();
-        }
-    });
+export async function initScreensaver() {
+    // Global Shortcut: Ctrl + Alt + `
+    console.log('[Screensaver] Attempting to register global shortcut: CommandOrControl+Alt+Backquote');
+    try {
+        await register('CommandOrControl+Alt+Backquote', (event) => {
+            console.log('[Screensaver] Shortcut triggered:', event);
+            if (event.state === 'Pressed') {
+                toggleScreensaver();
+            }
+        });
+        console.log('[Screensaver] Global shortcut registered successfully');
+    } catch (error) {
+        console.error('[Screensaver] Failed to register global shortcut:', error);
+    }
+
+    // Initialize Inactivity Timer
+    setupInactivityListener();
+    resetInactivityTimer();
 }
 
 export async function toggleScreensaver() {
@@ -31,6 +44,13 @@ export async function toggleScreensaver() {
 
 async function startScreensaver() {
     if (isScreensaverActive) return;
+
+    // Clear inactivity timer so we don't trigger again while active
+    if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+        inactivityTimer = null;
+    }
+
     isScreensaverActive = true;
     console.log('[Screensaver] Starting...');
 
@@ -162,7 +182,6 @@ async function stopScreensaver() {
         await appWindow.setIgnoreCursorEvents(false); // Enable events for windowed mode (standard behavior)
 
         // Restore size/pos if we have them
-        // Restore size/pos if we have them
         if (savedSize && savedPosition) {
             console.log(`[Screensaver] Restoring Pos: ${savedPosition.x}, ${savedPosition.y}`);
 
@@ -201,12 +220,13 @@ async function stopScreensaver() {
         // Ensure we are visible even if error
         document.body.style.opacity = '1';
     }
+
+    // Restart inactivity timer
+    resetInactivityTimer();
 }
 
 function handleExitKey(e: KeyboardEvent) {
     // Ignore the toggle shortcut itself if it was pressed to start
-    // But actually, toggle shortcut keys should logically toggle it OFF too.
-    // So we can probably just call stopScreensaver() on ANY key.
     stopScreensaver();
 }
 
@@ -214,20 +234,6 @@ let lastMousePos: { x: number; y: number } | null = null;
 const MOUSE_MOVE_THRESHOLD = 50; // Pixels
 
 function handleMouseMoveExit(e: MouseEvent) {
-    // Check threshold (e.g. 50px) to prevent jitter exit
-    // We can use e.screenX/Y or e.clientX/Y. 
-    // Since we are in fullscreen, clientX/Y roughly equals screen.
-    // We don't have the previous event easily without storing it, 
-    // but we can check movement magnitude if we stored the start pos.
-
-    // Actually simpler: just track if we moved significantly from start
-    // But since we can't easily get global mouse pos synchronously in var,
-    // let's just rely on the 1000ms delay being enough for the user to let go of the mouse.
-    // AND check e.movementX/Y if available, or just rely on a counter?
-
-    // Better: Just stopScreensaver. The 1s delay and threshold is key.
-    // Let's implement strict threshold if possible, but for now increasing delay is safer.
-
     if (lastMousePos) {
         const currentX = e.screenX;
         const currentY = e.screenY;
@@ -265,10 +271,26 @@ function moveCharacterRandomly() {
     const randomY = Math.max(0, Math.random() * maxHeight);
 
     // We use CSS transforms for smooth movement (defined in style.css)
-    // Or we can use top/left. Let's use top/left with absolute positioning.
     char.style.left = `${randomX}px`;
     char.style.top = `${randomY}px`;
+}
 
-    // Random direction flip?
-    // If moving right, scaleX(1), if left scaleX(-1) could be cool, but let's stick to simple first.
+function resetInactivityTimer() {
+    if (isScreensaverActive) return; // Don't reset if already active (handled by start/stop)
+
+    if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+    }
+
+    inactivityTimer = setTimeout(() => {
+        console.log('[Screensaver] Inactivity detected, starting screensaver...');
+        startScreensaver();
+    }, INACTIVITY_LIMIT);
+}
+
+function setupInactivityListener() {
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
+    events.forEach(event => {
+        window.addEventListener(event, resetInactivityTimer, { passive: true });
+    });
 }
