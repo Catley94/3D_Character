@@ -446,7 +446,11 @@ body.is-dragging #character {
   transition: border-color 0.2s ease;
 }
 
-/* Fix for unreadable dropdown options on Linux */
+/* Fix for unreadable dropdown options on Linux/Windows */
+.setting-group select {
+  color-scheme: dark;
+}
+
 .setting-group select option {
   background-color: #1e1e28;
   color: #f1f5f9;
