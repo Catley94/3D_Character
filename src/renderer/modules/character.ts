@@ -1,5 +1,6 @@
 import { state, CharacterState, CharacterStateValue } from './store';
 import { showSpeechBubble, showChatInput } from './chat';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 // DOM Elements
 const character = document.getElementById('character') as HTMLDivElement;
@@ -7,10 +8,6 @@ const characterContainer = document.getElementById('character-container') as HTM
 const characterImg = document.getElementById('character-img') as HTMLImageElement;
 const backpack = document.getElementById('backpack') as HTMLDivElement;
 const chatInputContainer = document.getElementById('chat-input-container') as HTMLDivElement;
-
-// ... (constants are fine)
-
-
 
 // Constants
 const clickReactions = [
@@ -21,42 +18,58 @@ const clickReactions = [
     "Ah! You found me! 🦊 What can I do for you?"
 ];
 
-// Drag State
-let dragStartMouseX: number, dragStartMouseY: number;
-// Store initial element position
-let dragStartLeft: number, dragStartTop: number;
+// Drag Tracking
+let startPos = { x: 0, y: 0 };
 
 export function initCharacter() {
+    character.addEventListener('mousedown', onCharacterMouseDown);
     character.addEventListener('click', onCharacterClick);
 
     updateCharacterTheme(state.config.theme || 'fox');
 
-    // Dragging (Pointer Events + Capture)
-    // Removed JS drag listeners to avoid conflict with data-tauri-drag-region
-    characterContainer.addEventListener('pointerup', (e) => {
-        if (state.isDragging) {
-            state.isDragging = false;
-            // window.electronAPI.setDragging(false);
-            document.body.classList.remove('is-dragging'); // Clear visual override
-            characterContainer.releasePointerCapture(e.pointerId);
+    // Initialize position logic (handled by OS/Tauri mostly)
+}
 
-            // MANUALLY TRIGGER CLICK if we didn't drag
-            if (!state.hasDragged) {
-                onCharacterClick(e as unknown as MouseEvent);
-            }
-        }
+function onCharacterMouseDown() {
+    getCurrentWindow().innerPosition().then(pos => {
+        startPos = pos;
     });
-    // lostpointercapture handles alt-tab or system interruptions
-    characterContainer.addEventListener('lostpointercapture', () => {
-        if (state.isDragging) {
-            state.isDragging = false;
-            // window.electronAPI.setDragging(false); // Removed for Tauri
-            document.body.classList.remove('is-dragging'); // Clear visual override
-        }
-    });
+}
 
-    // Initialize position if saved (TODO: Load from config)
-    // For now, respect CSS default (bottom-right)
+async function onCharacterClick(e: MouseEvent) {
+    console.log('[Character] Clicked');
+
+    // Check if we moved (dragged)
+    const currentPos = await getCurrentWindow().innerPosition();
+    const dx = Math.abs(currentPos.x - startPos.x);
+    const dy = Math.abs(currentPos.y - startPos.y);
+
+    // If moved more than 5px, assume it was a drag, not a click
+    if (dx > 5 || dy > 5) {
+        console.log('[Character] Ignored click due to drag');
+        return;
+    }
+
+    // Ignore clicks on backpack
+    if (e.target === backpack || backpack.contains(e.target as Node)) return;
+
+    // If already showing input or typing, don't react again
+    if (!chatInputContainer.classList.contains('hidden') || state.isTyping) return;
+
+    handleCharacterClick();
+}
+
+function handleCharacterClick() {
+    setState(CharacterState.CLICKED);
+
+    // Show reaction
+    showSpeechBubble(getRandomReaction());
+
+    // After reaction, show chat input
+    setTimeout(() => {
+        showChatInput();
+        setState(CharacterState.LISTENING);
+    }, 1500);
 }
 
 export function setState(newState: CharacterStateValue) {
@@ -90,35 +103,3 @@ export function updateCharacterTheme(theme: string) {
 function getRandomReaction() {
     return clickReactions[Math.floor(Math.random() * clickReactions.length)];
 }
-
-function onCharacterClick(e: MouseEvent) {
-    console.log('[Character] Clicked');
-    // Ignore clicks on backpack
-    if (e.target === backpack || backpack.contains(e.target as Node)) return;
-
-    // If already showing input or typing, don't react again
-    if (!chatInputContainer.classList.contains('hidden') || state.isTyping || state.hasDragged) return;
-
-    handleCharacterClick();
-}
-
-function handleCharacterClick() {
-    setState(CharacterState.CLICKED);
-
-    // Show reaction
-    showSpeechBubble(getRandomReaction());
-
-    // After reaction, show chat input
-    setTimeout(() => {
-        showChatInput();
-        setState(CharacterState.LISTENING);
-    }, 1500);
-}
-
-// ===== Drag Logic =====
-
-// We rely on data-tauri-drag-region in HTML for native window dragging.
-// This is much smoother and handles the window movement automatically.
-
-// End of file
-

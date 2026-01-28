@@ -48,6 +48,7 @@ export function initSettings() {
 }
 
 export function applyConfig(cfg: any) {
+    console.log('[Settings] Applying config:', cfg);
     state.config = cfg; // Update shared state
 
     apiProvider.value = cfg.provider || 'gemini';
@@ -78,12 +79,23 @@ export function applyConfig(cfg: any) {
     updateCharacterTheme(cfg.theme || 'fox');
 }
 
-function openSettings() {
+import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
+import { updateWindowSize } from './chat';
+
+async function openSettings() {
     settingsPanel.classList.remove('hidden');
+    // Resize window to fit settings comfortably
+    try {
+        await getCurrentWindow().setSize(new LogicalSize(500, 600));
+    } catch (e) {
+        console.error("Failed to resize for settings:", e);
+    }
 }
 
-function closeSettings() {
+async function closeSettings() {
     settingsPanel.classList.add('hidden');
+    // Restore window size to character/chat mode
+    await updateWindowSize();
 }
 
 async function saveSettings() {

@@ -395,7 +395,9 @@ body.is-dragging #character {
   background: var(--settings-bg);
   border-radius: 16px;
   padding: 24px;
-  width: 300px;
+  width: 100%;
+  max-width: 450px;
+  /* Increased from 300px */
   max-height: 80vh;
   overflow-y: auto;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
@@ -428,11 +430,18 @@ body.is-dragging #character {
   padding: 10px 12px;
   border: 1px solid #3f3f50;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(40, 40, 50, 0.95);
+  /* Solid-ish dark background for better contrast */
   color: var(--settings-text);
   font-size: 14px;
   outline: none;
   transition: border-color 0.2s ease;
+}
+
+/* Fix for unreadable dropdown options on Linux */
+.setting-group select option {
+  background-color: #1e1e28;
+  color: #f1f5f9;
 }
 
 .setting-group input:focus,

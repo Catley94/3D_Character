@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { state } from './modules/store';
 import { setupClickThrough } from './modules/interactions';
@@ -8,9 +9,15 @@ import { initSettings, applyConfig } from './modules/settings';
 async function init() {
     console.log('[Renderer] Initializing (Tauri)...');
 
-    // Load initial config (TODO: Implement config loading via Tauri Command)
-    const config = { theme: 'fox' }; // Placeholder until we reimplement config loading
-    // const config = await invoke('load_config'); 
+    // Load initial config from Rust
+    let config;
+    try {
+        config = await invoke('load_config');
+        console.log('[Renderer] Loaded config:', config);
+    } catch (e) {
+        console.error('[Renderer] Failed to load config:', e);
+        config = { theme: 'fox' };
+    }
 
     // Initialize Modules
     setupClickThrough();

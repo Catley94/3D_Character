@@ -117,7 +117,7 @@ function calculateWindowHeight(): number {
 // Helper to get current window info
 import { LogicalPosition } from '@tauri-apps/api/window';
 
-async function updateWindowSize() {
+export async function updateWindowSize() {
     const hasContent = !speechBubble.classList.contains('hidden') ||
         !chatInputContainer.classList.contains('hidden');
 
