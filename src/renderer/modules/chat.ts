@@ -132,28 +132,20 @@ export async function updateWindowSize() {
     const targetWidth = hasContent ? expandedWidth : baseWidth;
     const targetHeight = hasContent ? expandedHeight : baseHeight;
 
-    // ANCHOR LOGIC: Grow Upwards
-    // We want the bottom-left corner to stay roughly in place
-    // So if height increases, Y must decrease.
+    // ANCHOR LOGIC: Grow Downwards (Standard)
+    // We align content to Top-Left. Window expands down.
+    // Fox stays at Top-Left (or Top-Center) of the window.
+    // Bubble appears below Fox.
 
     try {
-        const currentPos = await appWindow.outerPosition();
         const currentSize = await appWindow.outerSize();
 
-        console.log(`[Resize] Current: ${currentPos.x},${currentPos.y} Size: ${currentSize.width}x${currentSize.height}`);
         console.log(`[Resize] Target Size: ${targetWidth}x${targetHeight}`);
 
-        // Calculate bottom edge Y coordinate
-        const bottomY = currentPos.y + currentSize.height;
-
-        // New Y = Bottom Y - New Height
-        const newY = bottomY - targetHeight;
-
-        console.log(`[Resize] Moving to Y: ${newY} (Shift: ${newY - currentPos.y})`);
-
-        // Move first to avoid "growing down" then "snapping up"
-        await appWindow.setPosition(new LogicalPosition(currentPos.x, newY));
-        await appWindow.setSize(new LogicalSize(targetWidth, targetHeight));
+        // Only resize, don't move. Top-Left stays fixed.
+        if (currentSize.width !== targetWidth || currentSize.height !== targetHeight) {
+            await appWindow.setSize(new LogicalSize(targetWidth, targetHeight));
+        }
 
     } catch (e) {
         console.error("Failed to resize window:", e);
