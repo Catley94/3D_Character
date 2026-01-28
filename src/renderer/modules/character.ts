@@ -39,6 +39,11 @@ function onCharacterMouseDown() {
 async function onCharacterClick(e: MouseEvent) {
     console.log('[Character] Clicked');
 
+    // Ignore clicks if in screensaver mode (privacy/wander mode)
+    if (document.body.classList.contains('screensaver-mode')) {
+        return;
+    }
+
     // Check if we moved (dragged)
     const currentPos = await getCurrentWindow().innerPosition();
     const dx = Math.abs(currentPos.x - startPos.x);

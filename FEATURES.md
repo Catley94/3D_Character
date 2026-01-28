@@ -86,3 +86,6 @@
 ### Visual Polish
 - **Seasonal Themes**: Automatic hats or accessories based on date (Santa hat in Dec, Pumpkin in Oct).
 - **Shadows & Lighting**: Drop shadows that respect screen position for more depth. - **Done**
+
+### 🐛 Known Issues / Bugs
+- [x] **Dismiss Button State**: Clicking the 'X' on the chat bubble hides the bubble but leaves the character in a `Listening` state. **(Fixed)**

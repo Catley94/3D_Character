@@ -2,6 +2,7 @@ import { state } from './store';
 import { updateCharacterTheme } from './character';
 import { showSpeechBubble, hideSpeechBubble } from './chat';
 import { invoke } from '@tauri-apps/api/core';
+import { toggleScreensaver } from './screensaver';
 
 // DOM Elements
 const settingsPanel = document.getElementById('settings-panel') as HTMLDivElement;
@@ -45,6 +46,14 @@ export function initSettings() {
 
     // Listen for tray event (TODO: Implement Tray in Rust)
     // listen('open-settings', () => openSettings());
+
+    const startScreensaverBtn = document.getElementById('start-screensaver');
+    if (startScreensaverBtn) {
+        startScreensaverBtn.addEventListener('click', () => {
+            toggleScreensaver();
+            closeSettings();
+        });
+    }
 }
 
 export function applyConfig(cfg: any) {

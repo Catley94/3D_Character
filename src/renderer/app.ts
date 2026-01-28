@@ -6,6 +6,7 @@ import { initCharacter } from './modules/character';
 import { initChat, activateChat } from './modules/chat';
 import { initSettings, applyConfig } from './modules/settings';
 import { initLighting } from './modules/lighting';
+import { initScreensaver } from './modules/screensaver';
 
 async function init() {
     console.log('[Renderer] Initializing (Tauri)...');
@@ -26,6 +27,7 @@ async function init() {
     initChat();
     initSettings();
     initLighting();
+    initScreensaver();
 
     // Apply config (updates UI, State, Theme)
     applyConfig(config);

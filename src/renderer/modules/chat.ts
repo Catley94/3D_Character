@@ -118,6 +118,12 @@ function calculateWindowHeight(): number {
 import { LogicalPosition } from '@tauri-apps/api/window';
 
 export async function updateWindowSize() {
+    // PREVENT RESIZE IN SCREENSAVER MODE
+    if (document.body.classList.contains('screensaver-mode')) {
+        console.log('[Resize] Blocked due to Screensaver Mode');
+        return;
+    }
+
     const hasContent = !speechBubble.classList.contains('hidden') ||
         !chatInputContainer.classList.contains('hidden');
 
@@ -230,11 +236,9 @@ function clearBubbleTimeout() {
 }
 
 function dismissBubble() {
-    clearBubbleTimeout();
-    hideSpeechBubble();
-    if (chatInputContainer.classList.contains('hidden')) {
-        updateWindowSize();
-    }
+    // If we dismiss manually, we should probably reset everything to idle
+    // so the character isn't stuck in "Listening" or "Talking"
+    returnToIdle(null);
 }
 
 function returnToIdle(message: string | null) {

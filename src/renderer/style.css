@@ -559,3 +559,27 @@ body.drag-mode-active #character {
 body.drag-mode-active #character:active {
   cursor: grabbing;
 }
+
+/* ========================================= */
+/* Screensaver Mode                          */
+/* ========================================= */
+body.screensaver-mode {
+  background-color: black !important;
+  /* Align to top-left to make absolute positioning calc easier if needed, 
+     but standard abspos respects viewport anyway. */
+}
+
+/* Hide UI elements in screensaver */
+body.screensaver-mode #backpack,
+body.screensaver-mode #chat-input-container {
+  display: none !important;
+}
+
+/* Character moves freely */
+body.screensaver-mode #character {
+  position: absolute;
+  /* Break out of flex flow */
+  /* Transition for smooth wandering */
+  transition: top 4s ease-in-out, left 4s ease-in-out;
+  z-index: 1000;
+}
