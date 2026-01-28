@@ -1,4 +1,5 @@
 import { getCurrentWindow, LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize, currentMonitor } from '@tauri-apps/api/window';
+import { listen } from '@tauri-apps/api/event';
 import { register } from '@tauri-apps/plugin-global-shortcut';
 import { showSpeechBubble, hideSpeechBubble, hideChatInput } from './chat';
 import { setState } from './character';
@@ -275,6 +276,8 @@ function moveCharacterRandomly() {
     char.style.top = `${randomY}px`;
 }
 
+
+
 function resetInactivityTimer() {
     if (isScreensaverActive) return; // Don't reset if already active (handled by start/stop)
 
@@ -289,8 +292,16 @@ function resetInactivityTimer() {
 }
 
 function setupInactivityListener() {
+    // Standard DOM events (Backups, work when window is focused/interactive)
     const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
     events.forEach(event => {
         window.addEventListener(event, resetInactivityTimer, { passive: true });
     });
+
+    // Tauri Global Events (Work even when click-through is enabled or window is ignored)
+    // These come from Rust backend (evdev monitoring)
+    listen('cursor-pos', resetInactivityTimer);
+    listen('click', resetInactivityTimer);
+    listen('shortcut', resetInactivityTimer);
+    listen('activity', resetInactivityTimer); // Global keyboard activity from Rust
 }

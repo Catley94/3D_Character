@@ -72,6 +72,7 @@ enum OutputEvent {
         screen_width: i32,
         screen_height: i32,
     },
+    Activity, // Generic activity (keyboard/mouse) for screensaver
 }
 
 // Structs are like Objects in JS or Classes in C#, but data-only.
@@ -358,6 +359,9 @@ fn process_device_events(
                             );
                         }
                     }
+
+                    // Always report activity for any key press (keyboard or mouse button)
+                    let _ = app_handle.emit("activity", OutputEvent::Activity);
                 }
             }
             _ => {}
