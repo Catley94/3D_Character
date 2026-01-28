@@ -383,6 +383,7 @@ body.is-dragging #character {
   justify-content: center;
   animation: fade-in 0.2s ease;
   -webkit-app-region: no-drag;
+  border-radius: 10px;
 }
 
 #settings-panel.hidden {
