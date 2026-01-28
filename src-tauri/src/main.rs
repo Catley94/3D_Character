@@ -480,6 +480,46 @@ fn load_config(app_handle: AppHandle) -> serde_json::Value {
 }
 
 // =============================================================================
+// Window Management (Screensaver Inhibition)
+// =============================================================================
+
+#[tauri::command]
+fn check_fullscreen() -> bool {
+    // 1. Get Active Window ID
+    let active_window_output = std::process::Command::new("xprop")
+        .args(&["-root", "_NET_ACTIVE_WINDOW"])
+        .output();
+
+    let window_id = match active_window_output {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            // Output format: "_NET_ACTIVE_WINDOW(WINDOW): window id # 0x1800003"
+            if let Some(pos) = stdout.find("window id # ") {
+                let id_part = &stdout[pos + 12..]; // Skip "window id # "
+                id_part.trim().to_string()
+            } else {
+                return false;
+            }
+        }
+        Err(_) => return false,
+    };
+
+    // 2. Check Window State
+    let state_output = std::process::Command::new("xprop")
+        .args(&["-id", &window_id, "_NET_WM_STATE"])
+        .output();
+
+    match state_output {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            // Output format: "_NET_WM_STATE(ATOM) = _NET_WM_STATE_FOCUSED, _NET_WM_STATE_FULLSCREEN"
+            stdout.contains("_NET_WM_STATE_FULLSCREEN")
+        }
+        Err(_) => false,
+    }
+}
+
+// =============================================================================
 // Main Application Entry Point
 // =============================================================================
 
@@ -487,7 +527,11 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_log::Builder::default().build()) // Enable logging
-        .invoke_handler(tauri::generate_handler![save_config, load_config]) // Register commands
+        .invoke_handler(tauri::generate_handler![
+            save_config,
+            load_config,
+            check_fullscreen
+        ]) // Register commands
         // .setup is where we initialize things when the app starts.
         .setup(|app| {
             // We need a handle to the app to send events from our background thread.

@@ -1,5 +1,4 @@
 import { getCurrentWindow, LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize, currentMonitor } from '@tauri-apps/api/window';
-import { listen } from '@tauri-apps/api/event';
 import { register } from '@tauri-apps/plugin-global-shortcut';
 import { showSpeechBubble, hideSpeechBubble, hideChatInput } from './chat';
 import { setState } from './character';
@@ -12,8 +11,6 @@ let savedPosition: LogicalPosition | PhysicalPosition | null = null;
 let savedSize: LogicalSize | PhysicalSize | null = null;
 
 const CHARACTER_SIZE = 150; // Approximation
-const INACTIVITY_LIMIT = 20000; // 20 seconds
-let inactivityTimer: NodeJS.Timeout | null = null;
 
 export async function initScreensaver() {
     // Global Shortcut: Ctrl + Alt + `
@@ -29,10 +26,6 @@ export async function initScreensaver() {
     } catch (error) {
         console.error('[Screensaver] Failed to register global shortcut:', error);
     }
-
-    // Initialize Inactivity Timer
-    setupInactivityListener();
-    resetInactivityTimer();
 }
 
 export async function toggleScreensaver() {
@@ -45,12 +38,6 @@ export async function toggleScreensaver() {
 
 async function startScreensaver() {
     if (isScreensaverActive) return;
-
-    // Clear inactivity timer so we don't trigger again while active
-    if (inactivityTimer) {
-        clearTimeout(inactivityTimer);
-        inactivityTimer = null;
-    }
 
     isScreensaverActive = true;
     console.log('[Screensaver] Starting...');
@@ -221,9 +208,6 @@ async function stopScreensaver() {
         // Ensure we are visible even if error
         document.body.style.opacity = '1';
     }
-
-    // Restart inactivity timer
-    resetInactivityTimer();
 }
 
 function handleExitKey(e: KeyboardEvent) {
@@ -274,34 +258,4 @@ function moveCharacterRandomly() {
     // We use CSS transforms for smooth movement (defined in style.css)
     char.style.left = `${randomX}px`;
     char.style.top = `${randomY}px`;
-}
-
-
-
-function resetInactivityTimer() {
-    if (isScreensaverActive) return; // Don't reset if already active (handled by start/stop)
-
-    if (inactivityTimer) {
-        clearTimeout(inactivityTimer);
-    }
-
-    inactivityTimer = setTimeout(() => {
-        console.log('[Screensaver] Inactivity detected, starting screensaver...');
-        startScreensaver();
-    }, INACTIVITY_LIMIT);
-}
-
-function setupInactivityListener() {
-    // Standard DOM events (Backups, work when window is focused/interactive)
-    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
-    events.forEach(event => {
-        window.addEventListener(event, resetInactivityTimer, { passive: true });
-    });
-
-    // Tauri Global Events (Work even when click-through is enabled or window is ignored)
-    // These come from Rust backend (evdev monitoring)
-    listen('cursor-pos', resetInactivityTimer);
-    listen('click', resetInactivityTimer);
-    listen('shortcut', resetInactivityTimer);
-    listen('activity', resetInactivityTimer); // Global keyboard activity from Rust
 }
