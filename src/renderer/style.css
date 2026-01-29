@@ -406,6 +406,8 @@ body.is-dragging #character {
   padding: 24px;
   width: 100%;
   max-width: 450px;
+  min-width: 300px;
+  /* Prevent squishing */
   /* Increased from 300px */
   max-height: 80vh;
   overflow-y: auto;

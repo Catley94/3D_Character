@@ -1,30 +1,45 @@
 import { getCurrentWindow, LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize, currentMonitor } from '@tauri-apps/api/window';
-import { register } from '@tauri-apps/plugin-global-shortcut';
+import { unregister, register } from '@tauri-apps/plugin-global-shortcut';
 import { showSpeechBubble, hideSpeechBubble, hideChatInput } from './chat';
 import { setState } from './character';
-import { CharacterState } from './store';
+import { CharacterState, state, defaultShortcuts } from './store';
 
 const appWindow = getCurrentWindow();
 let isScreensaverActive = false;
 let wanderInterval: NodeJS.Timeout | null = null;
 let savedPosition: LogicalPosition | PhysicalPosition | null = null;
 let savedSize: LogicalSize | PhysicalSize | null = null;
+let currentShortcut = '';
 
 const CHARACTER_SIZE = 150; // Approximation
 
 export async function initScreensaver() {
-    // Global Shortcut: Ctrl + Alt + `
-    console.log('[Screensaver] Attempting to register global shortcut: CommandOrControl+Alt+Backquote');
+    // Initial Registration handed by settings.ts (applyConfig)
+}
+
+export async function updateScreensaverShortcut(newShortcut: string) {
+    if (currentShortcut === newShortcut) return;
+
+    if (currentShortcut) {
+        try {
+            await unregister(currentShortcut);
+            console.log(`[Screensaver] Unregistered: ${currentShortcut}`);
+        } catch (e) {
+            console.warn(`[Screensaver] Failed to unregister: ${currentShortcut}`, e);
+        }
+    }
+
     try {
-        await register('CommandOrControl+Alt+Backquote', (event) => {
-            console.log('[Screensaver] Shortcut triggered:', event);
+        await register(newShortcut, (event) => {
+            console.log(`[Screensaver] Shortcut triggered: ${newShortcut}, State: ${event.state}`);
             if (event.state === 'Pressed') {
                 toggleScreensaver();
             }
         });
-        console.log('[Screensaver] Global shortcut registered successfully');
+        currentShortcut = newShortcut;
+        console.log(`[Screensaver] Registered: ${newShortcut}`);
     } catch (error) {
-        console.error('[Screensaver] Failed to register global shortcut:', error);
+        console.error(`[Screensaver] Failed to register: ${newShortcut}`, error);
     }
 }
 

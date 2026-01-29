@@ -30,6 +30,8 @@ A cute, interactive AI companion that lives on your desktop. Foxy (or your custo
     npm install
     ```
 
+
+
 3.  **Run in Dev Mode**:
     ```bash
     npm run dev

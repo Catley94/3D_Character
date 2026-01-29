@@ -16,9 +16,18 @@ export interface AppState {
     isWindowLocked: boolean;
 }
 
+export const defaultShortcuts = {
+    toggleChat: 'Super+Shift+F',
+    toggleDrag: 'Super+Shift+D',
+    toggleVisibility: 'Super+Shift+H',
+    screensaver: 'Super+Shift+Backquote'
+};
+
 export const state: AppState = {
     currentState: CharacterState.IDLE,
-    config: {},
+    config: {
+        shortcuts: defaultShortcuts
+    },
     isTyping: false,
     hasDragged: false,
     isDragging: false,

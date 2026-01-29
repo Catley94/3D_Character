@@ -129,36 +129,9 @@ impl InputState {
     // Returns `Option<&'static str>`:
     // - Option: Might receive a string, might receive None.
     // - &'static str: A string literal that lives for the entire program lifetime (like "toggle_chat").
-    fn check_shortcut(&self, trigger_key: Key) -> Option<&'static str> {
-        // Match expressions are like Switch statements on steroids.
-        // We aren't using match here, but `matches!` macro is similar.
-
-        if trigger_key == Key::KEY_F {
-            // Meta + Shift + F
-            let meta_held = self.is_modifier_held(Key::KEY_LEFTMETA)
-                || self.is_modifier_held(Key::KEY_RIGHTMETA);
-            let shift_held = self.is_modifier_held(Key::KEY_LEFTSHIFT)
-                || self.is_modifier_held(Key::KEY_RIGHTSHIFT);
-
-            if meta_held && shift_held {
-                // Return Some(...) to indicate success.
-                return Some("toggle_chat");
-            }
-        }
-
-        if trigger_key == Key::KEY_D {
-            // Meta + Shift + D
-            let meta_held = self.is_modifier_held(Key::KEY_LEFTMETA)
-                || self.is_modifier_held(Key::KEY_RIGHTMETA);
-            let shift_held = self.is_modifier_held(Key::KEY_LEFTSHIFT)
-                || self.is_modifier_held(Key::KEY_RIGHTSHIFT);
-
-            if meta_held && shift_held {
-                return Some("toggle_drag");
-            }
-        }
-
-        None // Implicit return of None
+    fn check_shortcut(&self, _trigger_key: Key) -> Option<&'static str> {
+        // Disabled in favor of Frontend Configurable Shortcuts (tauri-plugin-global-shortcut)
+        None
     }
 }
 

@@ -15,6 +15,7 @@
     "core:window:allow-set-resizable",
     "core:window:allow-set-fullscreen",
     "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister-all",
     "global-shortcut:default"
   ]
 }

@@ -1,4 +1,5 @@
-import { state, CharacterState, CharacterStateValue } from './store';
+import { unregister, register } from '@tauri-apps/plugin-global-shortcut';
+import { state, defaultShortcuts, CharacterState, CharacterStateValue } from './store';
 import { showSpeechBubble, showChatInput } from './chat';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
@@ -8,6 +9,8 @@ const characterContainer = document.getElementById('character-container') as HTM
 const characterImg = document.getElementById('character-img') as HTMLImageElement;
 const backpack = document.getElementById('backpack') as HTMLDivElement;
 const chatInputContainer = document.getElementById('chat-input-container') as HTMLDivElement;
+
+let currentToggleShortcut = '';
 
 // Constants
 const clickReactions = [
@@ -21,13 +24,80 @@ const clickReactions = [
 // Drag Tracking
 let startPos = { x: 0, y: 0 };
 
-export function initCharacter() {
+export async function initCharacter() {
     character.addEventListener('mousedown', onCharacterMouseDown);
     character.addEventListener('click', onCharacterClick);
 
     updateCharacterTheme(state.config.theme || 'fox');
 
     // Initialize position logic (handled by OS/Tauri mostly)
+}
+
+export async function updateVisibilityShortcut(newShortcut: string) {
+    if (currentToggleShortcut === newShortcut) return;
+
+    if (currentToggleShortcut) {
+        try {
+            await unregister(currentToggleShortcut);
+            console.log(`[Character] Unregistered: ${currentToggleShortcut}`);
+        } catch (e) {
+            console.warn(`[Character] Failed to unregister: ${currentToggleShortcut}`, e);
+        }
+    }
+
+    try {
+        await register(newShortcut, (event) => {
+            if (event.state === 'Pressed') {
+                toggleVisibility();
+            }
+        });
+        currentToggleShortcut = newShortcut;
+        console.log(`[Character] Toggle shortcut registered: ${newShortcut}`);
+    } catch (e) {
+        console.error(`[Character] Failed to register toggle shortcut: ${newShortcut}`, e);
+    }
+}
+
+let currentDragShortcut = '';
+
+export async function updateDragShortcut(newShortcut: string) {
+    if (currentDragShortcut === newShortcut) return;
+
+    if (currentDragShortcut) {
+        try {
+            await unregister(currentDragShortcut);
+            console.log(`[Character] Unregistered Drag: ${currentDragShortcut}`);
+        } catch (e) {
+            console.warn(`[Character] Failed to unregister drag: ${currentDragShortcut}`, e);
+        }
+    }
+
+    try {
+        await register(newShortcut, (event) => {
+            if (event.state === 'Pressed') {
+                const isDragMode = document.body.classList.toggle('drag-mode-active');
+                console.log(`[Character] Drag Mode: ${isDragMode ? 'ON' : 'OFF'}`);
+            }
+        });
+        currentDragShortcut = newShortcut;
+        console.log(`[Character] Registered Drag: ${newShortcut}`);
+    } catch (e) {
+        console.error(`[Character] Failed to register drag shortcut: ${newShortcut}`, e);
+    }
+}
+
+function toggleVisibility() {
+    const isVisible = characterContainer.style.opacity !== '0';
+
+    if (isVisible) {
+        console.log('[Character] Manual Toggle: HIDDEN');
+        characterContainer.style.opacity = '0';
+        characterContainer.style.pointerEvents = 'none';
+    } else {
+        console.log('[Character] Manual Toggle: VISIBLE');
+        characterContainer.style.opacity = '1';
+        characterContainer.style.pointerEvents = 'auto';
+    }
 }
 
 function onCharacterMouseDown() {

@@ -1,14 +1,18 @@
-import { state } from './store';
-import { updateCharacterTheme } from './character';
-import { showSpeechBubble, hideSpeechBubble } from './chat';
+import { state, defaultShortcuts } from './store';
+import { updateCharacterTheme, updateDragShortcut, updateVisibilityShortcut } from './character';
+import { showSpeechBubble, hideSpeechBubble, updateChatShortcut } from './chat';
 import { invoke } from '@tauri-apps/api/core';
-import { toggleScreensaver } from './screensaver';
+import { toggleScreensaver, updateScreensaverShortcut } from './screensaver';
 
 // DOM Elements
 const settingsPanel = document.getElementById('settings-panel') as HTMLDivElement;
 const backpack = document.getElementById('backpack') as HTMLDivElement;
 const closeSettingsBtn = document.getElementById('close-settings') as HTMLButtonElement;
 const saveSettingsBtn = document.getElementById('save-settings') as HTMLButtonElement;
+
+export function isSettingsOpen(): boolean {
+    return !settingsPanel.classList.contains('hidden');
+}
 
 // Form Elements
 const apiProvider = document.getElementById('api-provider') as HTMLSelectElement;
@@ -19,6 +23,14 @@ const characterName = document.getElementById('character-name') as HTMLInputElem
 const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
 const personalityCheckboxes = document.querySelectorAll('#personality-traits input') as NodeListOf<HTMLInputElement>;
 const debugModeCheckbox = document.getElementById('debug-mode') as HTMLInputElement;
+
+// Shortcut Inputs
+const shortcutInputs = {
+    toggleChat: document.getElementById('shortcut-toggle-chat') as HTMLInputElement,
+    toggleDrag: document.getElementById('shortcut-toggle-drag') as HTMLInputElement,
+    toggleVisibility: document.getElementById('shortcut-toggle-visibility') as HTMLInputElement,
+    screensaver: document.getElementById('shortcut-screensaver') as HTMLInputElement
+};
 
 export function initSettings() {
     backpack.addEventListener('click', (e) => {
@@ -86,6 +98,25 @@ export function applyConfig(cfg: any) {
     document.body.classList.toggle('debug-mode', cfg.debugMode || false);
 
     updateCharacterTheme(cfg.theme || 'fox');
+    updateCharacterTheme(cfg.theme || 'fox');
+
+    // Shortcuts
+    const shortcuts = cfg.shortcuts || defaultShortcuts;
+    updateChatShortcut(shortcuts.toggleChat || defaultShortcuts.toggleChat);
+    updateDragShortcut(shortcuts.toggleDrag || defaultShortcuts.toggleDrag);
+    updateVisibilityShortcut(shortcuts.toggleVisibility || defaultShortcuts.toggleVisibility);
+    updateScreensaverShortcut(shortcuts.screensaver || defaultShortcuts.screensaver);
+
+    shortcutInputs.toggleChat.value = shortcuts.toggleChat;
+    shortcutInputs.toggleDrag.value = shortcuts.toggleDrag;
+    shortcutInputs.toggleVisibility.value = shortcuts.toggleVisibility;
+    shortcutInputs.screensaver.value = shortcuts.screensaver;
+
+    // Update screensaver button text
+    const startScreensaverBtn = document.getElementById('start-screensaver');
+    if (startScreensaverBtn) {
+        startScreensaverBtn.innerText = `Start Screensaver Mode (${shortcuts.screensaver})`;
+    }
 }
 
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
@@ -95,7 +126,8 @@ async function openSettings() {
     settingsPanel.classList.remove('hidden');
     // Resize window to fit settings comfortably
     try {
-        await getCurrentWindow().setSize(new LogicalSize(500, 600));
+        await getCurrentWindow().setResizable(true);
+        await getCurrentWindow().setSize(new LogicalSize(550, 650));
     } catch (e) {
         console.error("Failed to resize for settings:", e);
     }
@@ -105,6 +137,11 @@ async function closeSettings() {
     settingsPanel.classList.add('hidden');
     // Restore window size to character/chat mode
     await updateWindowSize();
+    try {
+        await getCurrentWindow().setResizable(false);
+    } catch (e) {
+        console.warn("Failed to lock window size:", e);
+    }
 }
 
 async function saveSettings() {
@@ -125,7 +162,13 @@ async function saveSettings() {
         characterName: characterName.value,
         theme: themeSelect.value,
         personality: selectedPersonality,
-        debugMode: debugModeCheckbox.checked
+        debugMode: debugModeCheckbox.checked,
+        shortcuts: {
+            toggleChat: shortcutInputs.toggleChat.value.trim() || defaultShortcuts.toggleChat,
+            toggleDrag: shortcutInputs.toggleDrag.value.trim() || defaultShortcuts.toggleDrag,
+            toggleVisibility: shortcutInputs.toggleVisibility.value.trim() || defaultShortcuts.toggleVisibility,
+            screensaver: shortcutInputs.screensaver.value.trim() || defaultShortcuts.screensaver
+        }
     };
 
     try {

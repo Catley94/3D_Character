@@ -1,7 +1,9 @@
-import { state, CharacterState } from './store';
+import { state, CharacterState, defaultShortcuts } from './store';
 import { setState } from './character';
 import { geminiService } from '../services/gemini';
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
+import { unregister, register } from '@tauri-apps/plugin-global-shortcut';
+
 
 // DOM Elements
 const speechBubble = document.getElementById('speech-bubble') as HTMLDivElement;
@@ -67,6 +69,35 @@ export function initChat() {
     });
 }
 
+// ===== Shortcuts Logic =====
+
+let currentChatShortcut = '';
+
+export async function updateChatShortcut(newShortcut: string) {
+    if (currentChatShortcut === newShortcut) return;
+
+    if (currentChatShortcut) {
+        try {
+            await unregister(currentChatShortcut);
+            console.log(`[Chat] Unregistered: ${currentChatShortcut}`);
+        } catch (e) {
+            console.warn(`[Chat] Failed to unregister: ${currentChatShortcut}`, e);
+        }
+    }
+
+    try {
+        await register(newShortcut, (event) => {
+            if (event.state === 'Pressed') {
+                activateChat();
+            }
+        });
+        currentChatShortcut = newShortcut;
+        console.log(`[Chat] Registered: ${newShortcut}`);
+    } catch (e) {
+        console.error(`[Chat] Failed to register: ${newShortcut}`, e);
+    }
+}
+
 // ===== Speech Bubble Logic =====
 
 export function showSpeechBubble(text: string, animate = true) {
@@ -117,10 +148,18 @@ function calculateWindowHeight(): number {
 // Helper to get current window info
 import { LogicalPosition } from '@tauri-apps/api/window';
 
+import { isSettingsOpen } from './settings';
+
 export async function updateWindowSize() {
     // PREVENT RESIZE IN SCREENSAVER MODE
     if (document.body.classList.contains('screensaver-mode')) {
         console.log('[Resize] Blocked due to Screensaver Mode');
+        return;
+    }
+
+    // PREVENT RESIZE IF SETTINGS OPEN
+    if (isSettingsOpen()) {
+        console.log('[Resize] Blocked due to Settings Panel');
         return;
     }
 
