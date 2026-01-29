@@ -20,7 +20,7 @@ export const defaultShortcuts = {
     toggleChat: 'Super+Shift+F',
     toggleDrag: 'Super+Shift+D',
     toggleVisibility: 'Super+Shift+H',
-    screensaver: 'Super+Shift+Backquote'
+    screensaver: 'Super+Shift+S'
 };
 
 export const state: AppState = {
