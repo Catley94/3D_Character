@@ -155,17 +155,21 @@ export function setState(newState: CharacterStateValue) {
     const theme = state.config.theme || 'fox';
     const basePath = `themes/${theme}`;
 
+    const timestamp = new Date().getTime(); // Cache buster
     switch (newState) {
         case CharacterState.CLICKED:
-            characterImg.src = `${basePath}/clicked.png`;
+            characterImg.src = `${basePath}/clicked.png?t=${timestamp}`;
             break;
         case CharacterState.LISTENING:
-            characterImg.src = `${basePath}/listening.png`;
+            characterImg.src = `${basePath}/listening.png?t=${timestamp}`;
             break;
         case CharacterState.TALKING:
-            characterImg.src = `${basePath}/talking.png`;
+            console.log(`¬ [Character] Updating image to TALKING: ${basePath}/talking.png`);
+            characterImg.src = `${basePath}/talking.png?t=${timestamp}`;
             break;
         default:
+            console.log("¬ State: " + newState);
+            console.log(`¬ [Character] Updating image to IDLE: ${basePath}/idle.png`);
             characterImg.src = `${basePath}/idle.png`;
     }
 }

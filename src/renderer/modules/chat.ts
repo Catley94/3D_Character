@@ -100,11 +100,11 @@ export async function updateChatShortcut(newShortcut: string) {
 
 // ===== Speech Bubble Logic =====
 
-export function showSpeechBubble(text: string, animate = true) {
+export async function showSpeechBubble(text: string, animate = true) {
     speechBubble.classList.remove('hidden');
 
     if (animate) {
-        typeText(text);
+        await typeText(text);
     } else {
         bubbleText.textContent = text;
         setTimeout(updateWindowSize, 50);
@@ -320,6 +320,7 @@ async function sendMessage() {
             setState(CharacterState.TALKING);
             showSpeechBubble(`Oops! ${result.error} 😅`);
         } else {
+            console.log("Setting to TALKING");
             setState(CharacterState.TALKING);
             await showSpeechBubble(result.response || '');
         }
