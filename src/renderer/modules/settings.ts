@@ -63,7 +63,7 @@ export function initSettings() {
     if (startScreensaverBtn) {
         startScreensaverBtn.addEventListener('click', () => {
             toggleScreensaver();
-            closeSettings();
+            // closeSettings(); // Handled by toggleScreensaver now
         });
     }
 }

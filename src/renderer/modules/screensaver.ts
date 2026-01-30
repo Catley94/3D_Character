@@ -43,7 +43,16 @@ export async function updateScreensaverShortcut(newShortcut: string) {
     }
 }
 
+let lastToggleTime = 0;
+
 export async function toggleScreensaver() {
+    const now = Date.now();
+    if (now - lastToggleTime < 1000) {
+        console.log(`[Screensaver] Ignoring toggle (debounce: ${now - lastToggleTime}ms)`);
+        return;
+    }
+    lastToggleTime = now;
+
     if (isScreensaverActive) {
         stopScreensaver();
     } else {
@@ -54,10 +63,18 @@ export async function toggleScreensaver() {
 async function startScreensaver() {
     if (isScreensaverActive) return;
 
+    // RACE CONDITION FIX: Immediately set flag/class to block external resizes
+    document.body.classList.add('screensaver-mode');
     isScreensaverActive = true;
     console.log('[Screensaver] Starting...');
 
     try {
+        // CLOSE SETTINGS MANUALLY (Unify behavior)
+        const settingsPanel = document.getElementById('settings-panel');
+        if (settingsPanel && !settingsPanel.classList.contains('hidden')) {
+            settingsPanel.classList.add('hidden');
+        }
+
         // Save current state
         savedPosition = await appWindow.outerPosition();
         savedSize = await appWindow.outerSize();
@@ -90,6 +107,7 @@ async function startScreensaver() {
         }
 
         // Enter Fullscreen & Privacy Mode
+        // (Class already added at start, but good to ensure)
         document.body.classList.add('screensaver-mode');
 
         // Give WM a moment to process the resize before entering fullscreen
@@ -143,6 +161,7 @@ async function startScreensaver() {
     } catch (e) {
         console.error("Failed to start screensaver:", e);
         isScreensaverActive = false;
+        document.body.classList.remove('screensaver-mode');
         document.body.style.opacity = '1';
     }
 }
