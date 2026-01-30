@@ -105,10 +105,14 @@ export function toggleVisibility() {
     }
 }
 
-function onCharacterMouseDown() {
+function onCharacterMouseDown(e: MouseEvent) {
+    // Save position for click vs drag detection
     getCurrentWindow().innerPosition().then(pos => {
         startPos = pos;
     });
+
+    // Universal Drag: Allow moving the window anytime
+    getCurrentWindow().startDragging();
 }
 
 async function onCharacterClick(e: MouseEvent) {
@@ -140,6 +144,9 @@ async function onCharacterClick(e: MouseEvent) {
 }
 
 export function handleCharacterClick() {
+    // Basic guard: don't double-trigger if already acting
+    if (state.currentState !== CharacterState.IDLE) return;
+
     setState(CharacterState.CLICKED);
 
     // Show reaction

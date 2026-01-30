@@ -24,6 +24,7 @@ use std::fs;
 use std::io::Read;
 use std::os::fd::{AsRawFd, BorrowedFd}; // Linux-specific file descriptor stuff
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 use std::thread; // For spawning real OS threads
 
 // External Crates (Libraries)
@@ -32,7 +33,7 @@ use evdev::{Device, InputEventKind, Key, RelativeAxisType}; // For Linux input e
 use nix::libc;
 use nix::poll::{poll, PollFd, PollFlags}; // "Nix" provides Unix system calls
 use serde::Serialize; // "Serde" is the standard for Serialization (like JSON.stringify)
-use tauri::{AppHandle, Emitter, Manager}; // Tauri API
+use tauri::{AppHandle, Emitter, Manager, State}; // Tauri API
 
 // =============================================================================
 // Data Structures
@@ -79,6 +80,10 @@ struct InputState {
     held_modifiers: HashSet<Key>, // A Set of unique keys currently held down
     last_reported_x: i32,
     last_reported_y: i32,
+}
+
+struct SharedState {
+    input_state: Mutex<InputState>,
 }
 
 // `impl` blocks are where we define methods for our Structs.
@@ -460,6 +465,14 @@ fn load_config(app_handle: AppHandle) -> serde_json::Value {
     })
 }
 
+#[tauri::command]
+fn sync_cursor(state: State<SharedState>, x: i32, y: i32) {
+    let mut input = state.input_state.lock().unwrap();
+    input.cursor_x = x;
+    input.cursor_y = y;
+    // Don't report back to avoid loops, just update internal state
+}
+
 // =============================================================================
 // Window Management (Screensaver Inhibition)
 // =============================================================================
@@ -511,7 +524,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             save_config,
             load_config,
-            check_fullscreen
+            check_fullscreen,
+            sync_cursor
         ]) // Register commands
         // .setup is where we initialize things when the app starts.
         .setup(|app| {
@@ -521,12 +535,18 @@ fn main() {
 
             // SPAWN A BACKGROUND THREAD 🧵
             // Rust threads are real OS threads. This runs in parallel to the UI.
-            thread::spawn(move || {
-                // Initialize state
-                let (screen_width, screen_height) = detect_screen_size();
-                let mut state = InputState::new(screen_width, screen_height);
-                let mut devices = discover_devices();
+            // Initialize state
+            let (screen_width, screen_height) = detect_screen_size();
+            let shared_state = Arc::new(SharedState {
+                input_state: Mutex::new(InputState::new(screen_width, screen_height)),
+            });
 
+            // Register global state with Tauri
+            app.manage(shared_state.clone());
+
+            let app_handle_clone = app_handle.clone();
+            thread::spawn(move || {
+                let mut devices = discover_devices();
                 // Special file that aggregates all mice (useful fallback)
                 let mut mice_file = std::fs::File::open("/dev/input/mice").ok();
 
@@ -541,7 +561,7 @@ fn main() {
                     .count();
 
                 // Tell Frontend we are ready
-                let _ = app_handle.emit(
+                let _ = app_handle_clone.emit(
                     "ready",
                     OutputEvent::Ready {
                         mice_count: mice_count + if mice_file.is_some() { 1 } else { 0 },
@@ -564,9 +584,6 @@ fn main() {
 
                     // Add all individual devices
                     for d in &devices {
-                        // UNSAFE BLOCK: "Trust me, I know what I'm doing"
-                        // We need raw access to the file descriptor for the `poll` system call.
-                        // This is standard when interfacing with C libraries or Kernel APIs.
                         let borrowed = unsafe { BorrowedFd::borrow_raw(d.device.as_raw_fd()) };
                         poll_fds.push(PollFd::new(borrowed, PollFlags::POLLIN));
                     }
@@ -578,15 +595,19 @@ fn main() {
                     }
 
                     // WAIT for an event (Timeout: 1000ms)
-                    // This pauses the thread until data is available, so we don't use 100% CPU.
                     if let Ok(n) = poll(&mut poll_fds, nix::poll::PollTimeout::from(1000u16)) {
                         if n > 0 {
                             // Check which device has data
                             for (i, d) in devices.iter_mut().enumerate() {
                                 if let Some(revents) = poll_fds[i].revents() {
                                     if revents.contains(PollFlags::POLLIN) {
-                                        // Process it!
-                                        process_device_events(d, &mut state, &app_handle);
+                                        let mut input_state =
+                                            shared_state.input_state.lock().unwrap();
+                                        process_device_events(
+                                            d,
+                                            &mut input_state,
+                                            &app_handle_clone,
+                                        );
                                     }
                                 }
                             }
@@ -596,39 +617,43 @@ fn main() {
                                 let idx = poll_fds.len() - 1;
                                 if let Some(revents) = poll_fds[idx].revents() {
                                     if revents.contains(PollFlags::POLLIN) {
-                                        // PS/2 Protocol parsing (Legacy stuff)
                                         let mut buf = [0u8; 3];
                                         if let Some(ref mut f) = mice_file {
                                             if let Ok(3) = f.read(&mut buf) {
                                                 let rel_x = buf[1] as i8 as i32;
                                                 let rel_y = -(buf[2] as i8 as i32);
-                                                if state.update_cursor(rel_x, rel_y) {
-                                                    let _ = app_handle.emit(
+
+                                                let mut input_state =
+                                                    shared_state.input_state.lock().unwrap();
+                                                if input_state.update_cursor(rel_x, rel_y) {
+                                                    let _ = app_handle_clone.emit(
                                                         "cursor-pos",
                                                         OutputEvent::Cursor {
-                                                            x: state.cursor_x,
-                                                            y: state.cursor_y,
+                                                            x: input_state.cursor_x,
+                                                            y: input_state.cursor_y,
                                                         },
                                                     );
                                                 }
-                                                // Check clicks (Byte 0 bitmask)
+
+                                                // Check clicks (Byte 0 bitmask - Left button is bit 0)
                                                 if (buf[0] & 1) != 0 {
-                                                    let _ = app_handle.emit(
+                                                    let _ = app_handle_clone.emit(
                                                         "click",
                                                         OutputEvent::Click {
                                                             button: "left".into(),
-                                                            x: state.cursor_x,
-                                                            y: state.cursor_y,
+                                                            x: input_state.cursor_x,
+                                                            y: input_state.cursor_y,
                                                         },
                                                     );
                                                 }
+
                                                 if (buf[0] & 2) != 0 {
-                                                    let _ = app_handle.emit(
+                                                    let _ = app_handle_clone.emit(
                                                         "click",
                                                         OutputEvent::Click {
                                                             button: "right".into(),
-                                                            x: state.cursor_x,
-                                                            y: state.cursor_y,
+                                                            x: input_state.cursor_x,
+                                                            y: input_state.cursor_y,
                                                         },
                                                     );
                                                 }
@@ -639,7 +664,7 @@ fn main() {
                             }
                         } else {
                             // Timeout - Send heartbeat
-                            let _ = app_handle.emit("heartbeat", OutputEvent::Heartbeat);
+                            let _ = app_handle_clone.emit("heartbeat", OutputEvent::Heartbeat);
                         }
                     }
                 }

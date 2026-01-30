@@ -63,24 +63,15 @@ async function init() {
         if (name === 'toggle_screensaver') toggleScreensaver();
     });
 
-    // Backend Click Listener (Ensures clicks work even on transparent areas)
-    listen('click', async (event: any) => {
-        const { button, x: globalX, y: globalY } = event.payload;
-        if (button !== 'left') return;
+    // Cursor Synchronization (Ensures Rust backend is aligned for shortcuts)
+    window.addEventListener('mousemove', async (e) => {
+        // Calculate global coordinates
+        const pos = await appWindow.outerPosition();
+        const globalX = pos.x + e.clientX;
+        const globalY = pos.y + e.clientY;
 
-        // Check if click is inside our window
-        const pos = await appWindow.innerPosition();
-        const size = await appWindow.innerSize();
-
-        const isInside =
-            globalX >= pos.x && globalX <= pos.x + size.width &&
-            globalY >= pos.y && globalY <= pos.y + size.height;
-
-        if (isInside) {
-            console.log('[Backend Event] Internal Click detected');
-            // Trigger character interaction
-            handleCharacterClick();
-        }
+        // Sync to backend (don't await for performance)
+        invoke('sync_cursor', { x: Math.round(globalX), y: Math.round(globalY) });
     });
 
     console.log('[Renderer] Ready!');
