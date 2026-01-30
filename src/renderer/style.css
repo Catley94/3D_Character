@@ -277,6 +277,12 @@ body.is-dragging #character {
   margin: 0;
 }
 
+.chat-action {
+  font-style: italic;
+  color: #64748b;
+  font-size: 0.9em;
+}
+
 #bubble-tail {
   position: absolute;
   top: 0;

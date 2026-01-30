@@ -203,22 +203,90 @@ async function typeText(text: string) {
 
     try {
         bubbleText.innerHTML = '';
+
+        // Parse segments: Detect *text* as actions
+        const segments = [];
+        let cleanText = text;
+        const regex = /\*([^*]+)\*/g;
+        let lastIndex = 0;
+        let match;
+
+        while ((match = regex.exec(text)) !== null) {
+            // Text before match
+            if (match.index > lastIndex) {
+                segments.push({ type: 'text', content: text.slice(lastIndex, match.index) });
+            }
+            // The action itself
+            segments.push({ type: 'action', content: match[1] }); // content without asterisks
+            lastIndex = regex.lastIndex;
+        }
+        // Remaining text
+        if (lastIndex < text.length) {
+            segments.push({ type: 'text', content: text.slice(lastIndex) });
+        }
+
+        if (segments.length === 0) {
+            segments.push({ type: 'text', content: text });
+        }
+
         const cursor = document.createElement('span');
         cursor.className = 'typing-cursor';
 
-        for (let i = 0; i < text.length; i++) {
+        // Process each segment
+        for (const segment of segments) {
             if (speechBubble.classList.contains('hidden')) break;
 
-            bubbleText.textContent = text.substring(0, i + 1);
-            bubbleText.appendChild(cursor);
+            const span = document.createElement('span');
+            if (segment.type === 'action') {
+                span.className = 'chat-action';
+                // Add asterisks back for visual context, or just style the content? 
+                // User asked for markdown formatting like *wiggle ears* to show it within text.
+                // Usually this means displaying "*wiggle ears*" in italics or just "wiggle ears" in italics.
+                // Let's keep the asterisks as they are part of the roleplay feel usually, or remove them for cleaner UI?
+                // Request said "show it within the text".
+                // I will render it as `*action content*` but styled.
+                // Actually, standard partial styling usually keeps the text but styles it.
+                // Let's include the asterisks in the styled span for clarity unless user prefers otherwise.
+                // Re-reading: "markdown formatting like *wiggle ears* ... show it within the text".
+                // I will render "*wiggle ears*" all in italics/gray.
+                span.textContent = '';
+                bubbleText.appendChild(span);
 
-            if (i % 10 === 0) updateWindowSize();
+                const contentToType = `*${segment.content}*`;
 
-            await new Promise(r => setTimeout(r, 30 + Math.random() * 20));
+                for (let i = 0; i < contentToType.length; i++) {
+                    if (speechBubble.classList.contains('hidden')) break;
+                    span.textContent += contentToType[i];
+                    // Move cursor after the current span
+                    if (span.nextSibling === cursor) {
+                        // cursor is already there
+                    } else {
+                        bubbleText.appendChild(cursor);
+                    }
+
+                    if (i % 5 === 0) updateWindowSize();
+                    await new Promise(r => setTimeout(r, 20 + Math.random() * 20));
+                }
+            } else {
+                // Normal text
+                const textNode = document.createTextNode('');
+                bubbleText.appendChild(textNode);
+
+                for (let i = 0; i < segment.content.length; i++) {
+                    if (speechBubble.classList.contains('hidden')) break;
+                    textNode.textContent += segment.content[i];
+                    bubbleText.appendChild(cursor); // Ensure cursor is at end
+
+                    if (i % 10 === 0) updateWindowSize();
+                    await new Promise(r => setTimeout(r, 30 + Math.random() * 20));
+                }
+            }
         }
 
         updateWindowSize();
-        setTimeout(() => cursor.remove(), 1000);
+        setTimeout(() => {
+            if (cursor.parentNode) cursor.remove();
+        }, 1000);
 
     } catch (e) {
         console.error('Typing error:', e);
