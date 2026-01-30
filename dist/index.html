@@ -5,15 +5,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Character Assistant</title>
-  <script type="module" crossorigin src="/assets/index-CZQ0cy4y.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-D-7tlWNh.css">
+  <script type="module" crossorigin src="/assets/index-DX7-Fi-A.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BsAGQuvb.css">
 </head>
 
 <body>
   <!-- Main Character Container -->
   <div id="character-container">
     <!-- Character Image -->
-    <div id="character" class="state-idle">
+    <div id="character" class="state-idle" data-tauri-drag-region>
       <img id="character-img" src="themes/fox/idle.png" alt="Character" draggable="false">
 
       <!-- Backpack Settings Icon -->
@@ -104,8 +104,31 @@
         </div>
       </div>
 
+      <label><input type="checkbox" id="debug-mode"> 🐛 Debug Mode (show window border)</label>
+
+      <div class="setting-group" id="shortcuts-section">
+        <h3>⌨️ Keyboard Shortcuts</h3>
+        <p style="font-size: 0.8em; color: #aaa; margin-bottom: 10px;">Click input and press key combo.</p>
+
+        <label for="shortcut-toggle-chat">Toggle Chat</label>
+        <input type="text" id="shortcut-toggle-chat" class="shortcut-input" placeholder="CommandOrControl+Shift+F">
+
+        <label for="shortcut-toggle-drag">Toggle Drag</label>
+        <input type="text" id="shortcut-toggle-drag" class="shortcut-input" placeholder="CommandOrControl+Shift+D">
+
+        <label for="shortcut-toggle-visibility">Toggle Visibility (Hide/Show)</label>
+        <input type="text" id="shortcut-toggle-visibility" class="shortcut-input"
+          placeholder="CommandOrControl+Shift+H">
+
+        <label for="shortcut-screensaver">Screensaver</label>
+        <input type="text" id="shortcut-screensaver" class="shortcut-input" placeholder="Super+Shift+S">
+      </div>
+
       <div class="setting-group">
-        <label><input type="checkbox" id="debug-mode"> 🐛 Debug Mode (show window border)</label>
+        <button id="start-screensaver"
+          style="width: 100%; padding: 10px; background: #8b5cf6; border: none; border-radius: 8px; color: white; cursor: pointer;">
+          Start Screensaver Mode (Super+Shift+S)
+        </button>
       </div>
 
       <div class="setting-buttons">

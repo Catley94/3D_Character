@@ -91,6 +91,9 @@ async function startScreensaver() {
 
         // Enter Fullscreen & Privacy Mode
         document.body.classList.add('screensaver-mode');
+
+        // Give WM a moment to process the resize before entering fullscreen
+        await new Promise(r => setTimeout(r, 100));
         await appWindow.setFullscreen(true);
 
         // Ensure we capture all mouse events by disabling click-through

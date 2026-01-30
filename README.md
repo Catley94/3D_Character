@@ -9,11 +9,12 @@ A cute, interactive AI companion that lives on your desktop. Foxy (or your custo
 - **Interactive**: Reacts to clicks, drag-and-drop, and conversations.
 - **AI Powered**: Integrated with Google Gemini for personality-driven chat.
 - **Customizable**: Change themes, names, and personality traits.
+- **Linux Native**: Direct integration with Linux input subsystems for global cursor tracking and shortcuts, even on Wayland.
 
 ## 🛠️ Usage
     
 ### Prerequisites
-- **Linux Users**: You must be in the `input` group to allow the helper to read mouse events.
+- **Linux Users**: You must be in the `input` group to allow the app to read mouse events.
     ```bash
     sudo usermod -a -G input $USER
     # You must LOG OUT and LOG IN again for this to take effect!
@@ -25,68 +26,50 @@ A cute, interactive AI companion that lives on your desktop. Foxy (or your custo
     - **ON**: Window becomes opaque and clickable everywhere. You can drag Foxy to a new spot.
     - **OFF**: Window becomes "ghostly" again (clicks pass through except on Foxy).
 
+### Installation & Development
 1.  **Install Dependencies**:
     ```bash
     npm install
     ```
 
-
-
-3.  **Run in Dev Mode**:
+2.  **Run in Dev Mode**:
     ```bash
     npm run dev
     ```
-    *(Note: This automatically builds and spawns the Rust input helper)*
+
+3.  **Build for Production**:
+    ```bash
+    npm run tauri:build
+    ```
+    *(Note: This generates installable `.deb` and `.AppImage` files in `src-tauri/target/release/bundle/`)*
+
 ## 🐧 Linux / Wayland Compatibility
 
-To achieve the "Click-Through" transparency effect and global cursor tracking on Wayland, this app uses a custom Rust helper binary.
+To achieve global cursor tracking and shortcuts on Wayland, this app integrates directly with the Linux input subsystem.
 
 ### The Problem
 - **Wayland Security**: Apps cannot see the global cursor position or detect shortcuts when they are not focused.
-- **Click-Through**: Electron's `setIgnoreMouseEvents` is reliable for click-through, but we need to know *when* to disable it (i.e., when the mouse is over Foxy).
+- **Click-Through**: Standard windowing APIs often fail to provide reliable global tracking for overlay apps.
 
-### The Solution: `foxy-input-helper`
-We built a small Rust binary (`/foxy-input-helper`) that:
+### The Solution: Rust Backend
+We integrated raw input reading directly into the Tauri Rust backend:
 1.  Reads raw input events from `/dev/input/event*` and `/dev/input/mice`.
 2.  Tracks the **Global Cursor Position** (even on Wayland!).
 3.  Detects global **Shortcuts** (`Meta+Shift+F`, `Meta+Shift+D`).
-4.  Streams this data to the Electron app via JSON.
-
-This allows Foxy to look at your cursor and react to you, no matter what window you are using! 🚀
-
-## 🛠️ Development Mode**:
-    ```bash
-    npm run dev
-    ```
-3.  **Build for Production**:
-    ```bash
-    npm run build
-    ```
-
-### Initial Setup
-1.  Click the **Backpack Icon** 🎒 (appears on hover) to open Settings.
-2.  Enter your **Google Gemini API Key**.
-3.  Click **Save**. Foxy is now ready to chat!
+4.  Emits events directly to the frontend.
 
 ## 🏗️ Architecture
 
-The project is built with **Electron**, **TypeScript**, and **Vite**. It follows a modular architecture separating the Main (Node.js/Electron) and Renderer (UI) processes.
+The project is built with **Tauri**, **TypeScript**, and **Vite**.
 
 ### File Structure
 
 ```
-src/
-├── main/                 # Main Process (Node.js)
-│   ├── main.ts           # Entry Point & Lifecycle
-│   ├── ipc-handlers.ts   # IPC Event Registry
-│   ├── managers/         # Logic Controllers
-│   │   ├── window-manager.ts  # Window creation & config
-│   │   └── tray-manager.ts    # System Tray
-│   └── services/         # External Services
-│       ├── gemini.ts     # AI Logic
-│       └── config-store.ts    # File System Persistence
+├── src-tauri/            # Rust Backend (Tauri)
+│   ├── src/main.rs       # App logic, input reader, & IPC
+│   └── tauri.conf.json   # App configuration
 │
-└── renderer/             # Renderer Process (Web/UI)
+└── src/renderer/         # Frontend Process (Web/UI)
     ├── app.ts            # Entry Point
     └── modules/          # Feature Modules
         ├── character.ts  # Visuals, Dragging, Animations
@@ -98,53 +81,26 @@ src/
 
 ## 🧠 Event Flow Deep Dive
 
-One of the most complex features is the **Click-Through** mechanism. Here is how a click travels from your mouse to the application functions.
+### 1. Raw Input (Rust)
+The Rust background thread polls `/dev/input/` for events. When a mouse move or shortcut is detected, it calculates the new state.
 
-### The "Click-Through" Challenge
-By default, an Electron window is rectangular. If we make it transparent, you can see through it, but you can't *click* through the empty space to the window behind it. We solved this using `setIgnoreMouseEvents`.
+### 2. Event Emission
+The backend emits a `cursor-pos` or `shortcut` event via Tauri's event system.
 
-### 1. The Mouse Move (OS Level)
-As you move your mouse over the window, the OS fires events.
-
-### 2. The Renderer Detection (`src/renderer/modules/interactions.ts`)
-We listen to `mousemove` on the `window` object.
-```typescript
-window.addEventListener('mousemove', (e) => {
-    const element = document.elementFromPoint(e.clientX, e.clientY);
-    // ... logic checks if element is "Interactive" ...
-});
-```
-
-### 3. The Decision
-- **If hovering Foxy/Chat**: We call `window.electronAPI.setIgnoreMouseEvents(false)`.
-    - Result: The window **captures** future clicks. You can drag Foxy or type.
-- **If hovering Empty Space**: We call `window.electronAPI.setIgnoreMouseEvents(true, { forward: true })`.
-    - Result: The window becomes "ghostly". Clicks pass right through to your desktop wallpaper or other apps.
-
-### 4. The IPC Bridge (`src/main/ipc-handlers.ts`)
-The command travels from Renderer -> Main Process via Inter-Process Communication (IPC).
-```typescript
-ipcMain.on('set-ignore-mouse-events', (event, ignore, options) => {
-    // Tells the native OS window handle to update its hit-test behavior
-    win.setIgnoreMouseEvents(ignore, options);
-});
-```
-
-### 5. The User Click
-When you finally click:
-- If `ignore: false` (Foxy): HTML `click` event fires in `character.ts` -> `handleCharacterClick()` -> AI Chat starts.
-- If `ignore: true` (Empty): The OS sends the click to whatever is *behind* Foxy.
+### 3. Frontend Reaction
+The frontend listens for these events:
+- **`cursor-pos`**: Used for eye-tracking and interaction logic.
+- **`shortcut`**: Triggers actions like toggling chat or drag mode.
 
 ---
 
 ## 💻 Developer Guide
 
 ### Key Commands
-- **Logs**: In Dev mode, frontend `console.log` is piped to your terminal. Look for `[Renderer]` tags.
+- **Logs**: In Dev mode, check your terminal for both Rust and TypeScript logs.
 - **Debug Mode**: Go to Settings -> Enable Debug Mode to see borders around elements.
 
-### Adding a New Feature
-1.  **Frontend**: Create a new file in `src/renderer/modules/`.
-2.  **State**: Add any shared state to `store.ts`.
-3.  **Init**: Initialize your module in `src/renderer/app.ts`.
-4.  **Backend**: If you need Node.js access (files, system), add a handler in `src/main/ipc-handlers.ts`.
+### Initial Setup
+1.  Click the **Backpack Icon** 🎒 (appears on hover) to open Settings.
+2.  Enter your **Google Gemini API Key**.
+3.  Click **Save**. Foxy is now ready to chat!

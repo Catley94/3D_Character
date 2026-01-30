@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "ai-character-assistant",
-  "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "productName": "AI Character Assistant",
+  "version": "1.0.0",
+  "identifier": "com.sam.ai-character-assistant",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",

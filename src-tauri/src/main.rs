@@ -21,11 +21,9 @@
 // `use` is like `import` in JS or `using` in C#.
 use std::collections::HashSet;
 use std::fs;
-use std::io::{self, Read};
+use std::io::Read;
 use std::os::fd::{AsRawFd, BorrowedFd}; // Linux-specific file descriptor stuff
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering}; // Thread-safe booleans
-use std::sync::Arc; // "Atomic Reference Count" - safest way to share memory between threads
 use std::thread; // For spawning real OS threads
 
 // External Crates (Libraries)
@@ -63,9 +61,6 @@ enum OutputEvent {
         y: i32,
     },
     Heartbeat,
-    Error {
-        message: String,
-    },
     Ready {
         mice_count: usize, // `usize` is an unsigned integer the size of your CPU architecture (64-bit)
         keyboards_count: usize,
@@ -129,8 +124,21 @@ impl InputState {
     // Returns `Option<&'static str>`:
     // - Option: Might receive a string, might receive None.
     // - &'static str: A string literal that lives for the entire program lifetime (like "toggle_chat").
-    fn check_shortcut(&self, _trigger_key: Key) -> Option<&'static str> {
-        // Disabled in favor of Frontend Configurable Shortcuts (tauri-plugin-global-shortcut)
+    fn check_shortcut(&self, trigger_key: Key) -> Option<&'static str> {
+        // We use Meta (Super/Windows) + Shift as our base modifiers
+        let meta_held =
+            self.is_modifier_held(Key::KEY_LEFTMETA) || self.is_modifier_held(Key::KEY_RIGHTMETA);
+        let shift_held =
+            self.is_modifier_held(Key::KEY_LEFTSHIFT) || self.is_modifier_held(Key::KEY_RIGHTSHIFT);
+
+        if meta_held && shift_held {
+            match trigger_key {
+                Key::KEY_F => return Some("toggle_chat"),
+                Key::KEY_D => return Some("toggle_drag"),
+                Key::KEY_S => return Some("toggle_screensaver"),
+                _ => {}
+            }
+        }
         None
     }
 }
@@ -629,6 +637,9 @@ fn main() {
                                     }
                                 }
                             }
+                        } else {
+                            // Timeout - Send heartbeat
+                            let _ = app_handle.emit("heartbeat", OutputEvent::Heartbeat);
                         }
                     }
                 }

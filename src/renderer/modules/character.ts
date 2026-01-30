@@ -75,8 +75,7 @@ export async function updateDragShortcut(newShortcut: string) {
     try {
         await register(newShortcut, (event) => {
             if (event.state === 'Pressed') {
-                const isDragMode = document.body.classList.toggle('drag-mode-active');
-                console.log(`[Character] Drag Mode: ${isDragMode ? 'ON' : 'OFF'}`);
+                toggleDragMode();
             }
         });
         currentDragShortcut = newShortcut;
@@ -86,7 +85,13 @@ export async function updateDragShortcut(newShortcut: string) {
     }
 }
 
-function toggleVisibility() {
+export function toggleDragMode() {
+    const isDragMode = document.body.classList.toggle('drag-mode-active');
+    console.log(`[Character] Drag Mode: ${isDragMode ? 'ON' : 'OFF'}`);
+    return isDragMode;
+}
+
+export function toggleVisibility() {
     const isVisible = characterContainer.style.opacity !== '0';
 
     if (isVisible) {
@@ -134,7 +139,7 @@ async function onCharacterClick(e: MouseEvent) {
     handleCharacterClick();
 }
 
-function handleCharacterClick() {
+export function handleCharacterClick() {
     setState(CharacterState.CLICKED);
 
     // Show reaction
