@@ -2,6 +2,7 @@ import { unregister, register } from '@tauri-apps/plugin-global-shortcut';
 import { state, defaultShortcuts, CharacterState, CharacterStateValue } from './store';
 import { showSpeechBubble, showChatInput } from './chat';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { listen } from '@tauri-apps/api/event';
 
 // DOM Elements
 const character = document.getElementById('character') as HTMLDivElement;
@@ -31,6 +32,36 @@ export async function initCharacter() {
     updateCharacterTheme(state.config.theme || 'fox');
 
     // Initialize position logic (handled by OS/Tauri mostly)
+
+    // Listen for Backend Click Events (Windows Fallback)
+    listen('click', async (event: any) => {
+        const { button, x, y } = event.payload;
+        if (button !== 'left') return;
+
+        console.log(`[Character] Backend Click at ${x},${y}`);
+
+        // Check bounds
+        try {
+            const windowPos = await getCurrentWindow().outerPosition();
+            const rect = character.getBoundingClientRect(); // Relative to viewport
+
+            // Global Bounds of Character
+            const left = windowPos.x + rect.left;
+            const top = windowPos.y + rect.top;
+            const right = left + rect.width;
+            const bottom = top + rect.height;
+
+            // Check intersection (with some padding/tolerance)
+            if (x >= left && x <= right && y >= top && y <= bottom) {
+                console.log('[Character] Hit detected via Backend Event!');
+                // Directly trigger handler to bypass DOM-based drag checks which might fail
+                // if mousedown didn't fire.
+                handleCharacterClick();
+            }
+        } catch (e) {
+            console.error('[Character] Click check failed:', e);
+        }
+    });
 }
 
 export async function updateVisibilityShortcut(newShortcut: string) {
