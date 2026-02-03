@@ -24,7 +24,10 @@
         "skipTaskbar": true,
         "visibleOnAllWorkspaces": true
       }
-    ]
+    ],
+    "security": {
+      "csp": null
+    }
   },
   "bundle": {
     "active": true,
@@ -41,8 +44,5 @@
         "installMode": "currentUser"
       }
     }
-  },
-  "security": {
-    "csp": null
   }
 }

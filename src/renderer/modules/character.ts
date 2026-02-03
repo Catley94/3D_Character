@@ -33,12 +33,33 @@ export async function initCharacter() {
 
     // Initialize position logic (handled by OS/Tauri mostly)
 
-    // Listen for Backend Click Events (Windows Fallback)
-    listen('click', async (event: any) => {
+    // Listen for Backend Mouse Events (Windows Fallback)
+    let backendStartPos = { x: 0, y: 0 };
+
+    // Track Mousedown
+    listen('mousedown', async (event: any) => {
+        const { button, x, y } = event.payload;
+        if (button === 'left') {
+            backendStartPos = { x, y };
+        }
+    });
+
+    // Track Mouseup
+    listen('mouseup', async (event: any) => {
         const { button, x, y } = event.payload;
         if (button !== 'left') return;
 
-        console.log(`[Character] Backend Click at ${x},${y}`);
+        // Calculate distance
+        const dx = Math.abs(x - backendStartPos.x);
+        const dy = Math.abs(y - backendStartPos.y);
+
+        // Debug
+        // console.log(`[Character] MouseUp at ${x},${y}. Moved: ${dx},${dy}`);
+
+        if (dx > 5 || dy > 5) {
+            console.log('[Character] Ignored click due to drag (Backend Event)');
+            return;
+        }
 
         // Check bounds
         try {

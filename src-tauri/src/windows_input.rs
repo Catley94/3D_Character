@@ -167,18 +167,29 @@ unsafe extern "system" fn wnd_proc(
                 let buttons = mouse.Anonymous.Anonymous.usButtonFlags;
                 
                 if buttons != 0 {
-                     if (buttons & 0x0001) != 0 {
+                     if (buttons & 0x0001) != 0 { // Down
                          let input_state = context.state.input_state.lock().unwrap();
-                         let _ = context.app.emit("click", OutputEvent::Click { button: "left".into(), x: input_state.cursor_x, y: input_state.cursor_y });
+                         let _ = context.app.emit("mousedown", OutputEvent::Click { button: "left".into(), x: input_state.cursor_x, y: input_state.cursor_y });
                      }
-                     if (buttons & 0x0004) != 0 { // RI_MOUSE_RIGHT_BUTTON_DOWN = 0x0004
+                     if (buttons & 0x0002) != 0 { // Up
                          let input_state = context.state.input_state.lock().unwrap();
-                         let _ = context.app.emit("click", OutputEvent::Click { button: "right".into(), x: input_state.cursor_x, y: input_state.cursor_y });
+                         let _ = context.app.emit("mouseup", OutputEvent::Click { button: "left".into(), x: input_state.cursor_x, y: input_state.cursor_y });
                      }
-                     if (buttons & 0x0010) != 0 { // RI_MOUSE_MIDDLE_BUTTON_DOWN = 0x0010
+
+                     if (buttons & 0x0004) != 0 { // Right Down
                          let input_state = context.state.input_state.lock().unwrap();
-                         let _ = context.app.emit("click", OutputEvent::Click { button: "middle".into(), x: input_state.cursor_x, y: input_state.cursor_y });
+                         let _ = context.app.emit("mousedown", OutputEvent::Click { button: "right".into(), x: input_state.cursor_x, y: input_state.cursor_y });
                      }
+                     if (buttons & 0x0008) != 0 { // Right Up
+                         let input_state = context.state.input_state.lock().unwrap();
+                         let _ = context.app.emit("mouseup", OutputEvent::Click { button: "right".into(), x: input_state.cursor_x, y: input_state.cursor_y });
+                     }
+
+                     if (buttons & 0x0010) != 0 { // Middle Down
+                         let input_state = context.state.input_state.lock().unwrap();
+                         let _ = context.app.emit("mousedown", OutputEvent::Click { button: "middle".into(), x: input_state.cursor_x, y: input_state.cursor_y });
+                     }
+                     // Middle Up is 0x0020 if needed
                      
                      let _ = context.app.emit("activity", OutputEvent::Activity);
                 }
