@@ -5,7 +5,7 @@ use crate::shared::{KeyCode, OutputEvent, SharedState};
 #[cfg(target_os = "windows")]
 use std::sync::Arc;
 #[cfg(target_os = "windows")]
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 #[cfg(target_os = "windows")]
 use windows::core::s;
 #[cfg(target_os = "windows")]
@@ -139,14 +139,66 @@ unsafe extern "system" fn wnd_proc(
                      // Use absolute OS cursor position
                      input_state.cursor_x = point.x;
                      input_state.cursor_y = point.y;
-                     
-                     // We still call update_cursor to trigger logic/clamping if needed, 
-                     // but we manually unified the state first.
-                     // Actually, let's just emit directly or update state.
-                     // InputState::update_cursor adds delta. We want absolute.
-                     
-                     // Let's modify InputState to allow absolute set or just set it here.
-                     // Since input_state is locked, we can set it.
+
+                    // Click-Through Logic
+                    // Check if we have character bounds
+                    if let Some(rect) = input_state.character_rect {
+                        drop(input_state); // Release lock before calling Tauri methods which might deadlock
+                        
+                        if let Some(window) = context.app.get_webview_window("main") {
+                             // Get Main Window HWND
+                             if let Ok(hwnd_main) = window.hwnd() {
+                                 let mut win_rect = RECT::default();
+                                 unsafe {
+                                     let _ = GetWindowRect(HWND(hwnd_main.0 as isize), &mut win_rect);
+                                 };
+                                 
+                                 // Calculate Global Character Bounds
+                                 // Rect is relative to viewport (client area?)
+                                 // Standard GetWindowRect returns screen coordinates of top-left corner including titlebar/borders?
+                                 // Tauri's window usually frameless.
+                                 // If transparency is on, the client area usually matches.
+                                 // 
+                                 // Wait, `inner_position` vs `outer_position`.
+                                 // We really want the client area top-left.
+                                 // But since we can't easily call async Tauri methods here, we rely on HWND.
+                                 // For a frameless window, GetWindowRect approximates the visual area.
+                                 // 
+                                 // Let's assume window.x + rect.x
+                                 let win_x = win_rect.left;
+                                 let win_y = win_rect.top;
+                                 
+                                 let char_global_x = win_x + rect.x;
+                                 let char_global_y = win_y + rect.y;
+                                 let char_global_w = rect.width;
+                                 let char_global_h = rect.height;
+                                 
+                                 let cursor_x = point.x;
+                                 let cursor_y = point.y;
+                                 
+                                 let is_over_character = 
+                                     cursor_x >= char_global_x &&
+                                     cursor_x <= char_global_x + char_global_w &&
+                                     cursor_y >= char_global_y &&
+                                     cursor_y <= char_global_y + char_global_h;
+                                     
+                                 // We need to store current state to avoid excessive calls?
+                                 // Tauri's set_ignore_cursor_events handles this gracefully? 
+                                 // It sends a message to the window.
+                                 // It's better to avoid spamming it. 
+                                 // But we don't have "current ignore state" easily accessible.
+                                 // We can add it to context or shared state. 
+                                 // For now, let's just call it.
+                                 
+                                 // If over character -> Interactive (ignore = false)
+                                 // If NOT over character -> Pass-through (ignore = true)
+                                 let _ = window.set_ignore_cursor_events(!is_over_character);
+                             }
+                        }
+                        
+                         // Re-acquire lock to update last_reported if needed
+                         input_state = context.state.input_state.lock().unwrap();
+                    }
                      
                      // Only emit if changed?
                      if input_state.cursor_x != input_state.last_reported_x || input_state.cursor_y != input_state.last_reported_y {

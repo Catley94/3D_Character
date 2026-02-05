@@ -3,6 +3,9 @@ import { state, defaultShortcuts, CharacterState, CharacterStateValue } from './
 import { showSpeechBubble, showChatInput } from './chat';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
+
+// DOM Elements
 
 // DOM Elements
 const character = document.getElementById('character') as HTMLDivElement;
@@ -83,6 +86,31 @@ export async function initCharacter() {
             console.error('[Character] Click check failed:', e);
         }
     });
+
+    // Initialize Bounds Tracking
+    updateBounds();
+    window.addEventListener('resize', () => {
+        updateBounds();
+    });
+
+    // Periodically update bounds just in case of layout shifts?
+    setInterval(updateBounds, 1000);
+}
+
+export async function updateBounds() {
+    try {
+        const rect = character.getBoundingClientRect();
+        // Send integer bounds
+        await invoke('update_character_bounds', {
+            x: Math.round(rect.x),
+            y: Math.round(rect.y),
+            w: Math.round(rect.width),
+            h: Math.round(rect.height)
+        });
+        // console.log(`[Character] Updated Bounds: ${rect.x}, ${rect.y}, ${rect.width}x${rect.height}`);
+    } catch (e) {
+        console.warn(`[Character] Failed to update bounds:`, e);
+    }
 }
 
 export async function updateVisibilityShortcut(newShortcut: string) {

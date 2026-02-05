@@ -31,6 +31,20 @@ pub enum KeyCode {
     Unknown,
 }
 
+#[derive(Serialize, Debug, Clone, Copy, Default)]
+pub struct Rect {
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+}
+
+impl Rect {
+    pub fn contains(&self, x: i32, y: i32) -> bool {
+        x >= self.x && x <= self.x + self.width && y >= self.y && y <= self.y + self.height
+    }
+}
+
 #[derive(Serialize, Debug, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum OutputEvent {
@@ -64,6 +78,11 @@ pub struct InputState {
     pub held_modifiers: HashSet<KeyCode>, 
     pub last_reported_x: i32,
     pub last_reported_y: i32,
+    // Store bounds relative to window, or screen?
+    // Plan: Frontend sends bounds relative to viewport. 
+    // Backend needs to check global mouse vs (Window Pos + Bounds).
+    // Or we store just the local bounds here and let windows_input handle the logic.
+    pub character_rect: Option<Rect>,
 }
 
 pub struct SharedState {
@@ -80,6 +99,7 @@ impl InputState {
             held_modifiers: HashSet::new(),
             last_reported_x: -1,
             last_reported_y: -1,
+            character_rect: None,
         }
     }
 

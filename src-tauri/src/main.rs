@@ -81,6 +81,18 @@ fn sync_cursor(state: State<Arc<SharedState>>, x: i32, y: i32) {
     input.cursor_y = y;
 }
 
+#[tauri::command]
+fn update_character_bounds(state: State<Arc<SharedState>>, x: i32, y: i32, w: i32, h: i32) {
+    let mut input = state.input_state.lock().unwrap();
+    input.character_rect = Some(shared::Rect {
+        x,
+        y,
+        width: w,
+        height: h,
+    });
+    // println!("[Main] Character Bounds Updated: {:?} ", input.character_rect);
+}
+
 // =============================================================================
 // Window Management
 // =============================================================================
@@ -102,7 +114,9 @@ fn main() {
             save_config,
             load_config,
             check_fullscreen,
-            sync_cursor
+            check_fullscreen,
+            sync_cursor,
+            update_character_bounds
         ]) 
         .setup(|app| {
             let app_handle = app.handle().clone();
