@@ -541,6 +541,12 @@ fn main() {
                 input_state: Mutex::new(InputState::new(screen_width, screen_height)),
             });
 
+            // FIX: Enforce Always on Top for Production (Linux Galore)
+            // Sometimes the window manager ignores the initial config in release mode
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_always_on_top(true);
+            }
+
             // Register global state with Tauri
             app.manage(shared_state.clone());
 
