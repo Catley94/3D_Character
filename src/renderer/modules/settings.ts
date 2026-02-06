@@ -1,8 +1,10 @@
 import { state, defaultShortcuts } from './store';
-import { updateCharacterTheme, updateDragShortcut, updateVisibilityShortcut } from './character';
+import { updateCharacterTheme, updateDragShortcut, updateVisibilityShortcut, setInteractionOverride } from './character';
 import { showSpeechBubble, hideSpeechBubble, updateChatShortcut } from './chat';
 import { invoke } from '@tauri-apps/api/core';
 import { toggleScreensaver, updateScreensaverShortcut } from './screensaver';
+import { listen } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 // DOM Elements
 const settingsPanel = document.getElementById('settings-panel') as HTMLDivElement;
@@ -66,6 +68,41 @@ export function initSettings() {
             // closeSettings(); // Handled by toggleScreensaver now
         });
     }
+
+    // Backend Click Listener for Settings Icon (Windows Fallback)
+    let backendStartPos = { x: 0, y: 0 };
+    listen('mousedown', (event: any) => {
+        const { button, x, y } = event.payload;
+        if (button === 'left') backendStartPos = { x, y };
+    });
+
+    listen('mouseup', async (event: any) => {
+        const { button, x, y } = event.payload;
+        if (button !== 'left') return;
+
+        // Check drag threshold
+        const dx = Math.abs(x - backendStartPos.x);
+        const dy = Math.abs(y - backendStartPos.y);
+        if (dx > 5 || dy > 5) return;
+
+        // Check intersection with backpack
+        try {
+            const windowPos = await getCurrentWindow().outerPosition();
+            const rect = backpack.getBoundingClientRect();
+
+            const left = windowPos.x + rect.left;
+            const top = windowPos.y + rect.top;
+            const right = left + rect.width;
+            const bottom = top + rect.height;
+
+            if (x >= left && x <= right && y >= top && y <= bottom) {
+                console.log('[Settings] Click detected via Backend!');
+                openSettings();
+            }
+        } catch (e) {
+            console.error('[Settings] Click check failed:', e);
+        }
+    });
 }
 
 export function applyConfig(cfg: any) {
@@ -119,11 +156,12 @@ export function applyConfig(cfg: any) {
     }
 }
 
-import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
+import { LogicalSize } from '@tauri-apps/api/window';
 import { updateWindowSize } from './chat';
 
 async function openSettings() {
     settingsPanel.classList.remove('hidden');
+    setInteractionOverride(true);
     // Resize window to fit settings comfortably
     try {
         await getCurrentWindow().setResizable(true);
@@ -135,6 +173,7 @@ async function openSettings() {
 
 async function closeSettings() {
     settingsPanel.classList.add('hidden');
+    setInteractionOverride(false);
     // Restore window size to character/chat mode
     await updateWindowSize();
     try {

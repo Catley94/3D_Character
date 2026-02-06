@@ -1,7 +1,11 @@
 import { unregister, register } from '@tauri-apps/plugin-global-shortcut';
 import { state, defaultShortcuts, CharacterState, CharacterStateValue } from './store';
-import { showSpeechBubble, showChatInput } from './chat';
+import { showSpeechBubble, showChatInput, hideSpeechBubble } from './chat';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
+
+// DOM Elements
 
 // DOM Elements
 const character = document.getElementById('character') as HTMLDivElement;
@@ -24,13 +28,127 @@ const clickReactions = [
 // Drag Tracking
 let startPos = { x: 0, y: 0 };
 
+// Wiggle Detection
+let lastWiggleCheck = 0;
+let wiggleHistory: number[] = [];
+let lastMouseX = 0;
+let speechBubbleTimeout: number | undefined; // Store timeout ID
+const WIGGLE_THRESHOLD = 4; // Number of direction flips
+const WIGGLE_TIMEOUT = 500; // ms to reset
+const WIGGLE_MIN_SPEED = 5; // Minimum px movement to count as a "move"
+import { LogicalPosition } from '@tauri-apps/api/window';
+
+
+
 export async function initCharacter() {
     character.addEventListener('mousedown', onCharacterMouseDown);
     character.addEventListener('click', onCharacterClick);
+    character.addEventListener('mousemove', onCharacterMouseMove);
 
     updateCharacterTheme(state.config.theme || 'fox');
 
     // Initialize position logic (handled by OS/Tauri mostly)
+
+    // Listen for Backend Mouse Events (Windows Fallback)
+    let backendStartPos = { x: 0, y: 0 };
+
+    // Track Mousedown
+    listen('mousedown', async (event: any) => {
+        const { button, x, y } = event.payload;
+        if (button === 'left') {
+            backendStartPos = { x, y };
+        }
+    });
+
+    // Track Mouseup
+    listen('mouseup', async (event: any) => {
+        const { button, x, y } = event.payload;
+        if (button !== 'left') return;
+
+        // Calculate distance
+        const dx = Math.abs(x - backendStartPos.x);
+        const dy = Math.abs(y - backendStartPos.y);
+
+        // Debug
+        // console.log(`[Character] MouseUp at ${x},${y}. Moved: ${dx},${dy}`);
+
+        if (dx > 5 || dy > 5) {
+            console.log('[Character] Ignored click due to drag (Backend Event)');
+            return;
+        }
+
+        // Check bounds
+        try {
+            const windowPos = await getCurrentWindow().outerPosition();
+            const rect = character.getBoundingClientRect(); // Relative to viewport
+
+            // Global Bounds of Character
+            const left = windowPos.x + rect.left;
+            const top = windowPos.y + rect.top;
+            const right = left + rect.width;
+            const bottom = top + rect.height;
+
+            // Check intersection (with some padding/tolerance)
+            if (x >= left && x <= right && y >= top && y <= bottom) {
+                console.log('[Character] Hit detected via Backend Event!');
+                // Directly trigger handler to bypass DOM-based drag checks which might fail
+                // if mousedown didn't fire.
+                handleCharacterClick();
+            }
+        } catch (e) {
+            console.error('[Character] Click check failed:', e);
+        }
+    });
+
+    // Initialize Bounds Tracking
+    updateBounds();
+    window.addEventListener('resize', () => {
+        updateBounds();
+    });
+
+    // Periodically update bounds just in case of layout shifts?
+    setInterval(updateBounds, 1000);
+}
+
+let overrideInteraction = false;
+
+export function setInteractionOverride(active: boolean) {
+    overrideInteraction = active;
+    updateBounds(); // Immediate update
+}
+
+export async function updateBounds() {
+    try {
+        if (overrideInteraction) {
+            // Send large bounds to cover everything (or just window size)
+            // Since backend checks global mouse vs global bounds:
+            // We can send a large rect, or ideally, fetch current window size.
+            // For simplicity, let's fetch current window size.
+            const win = getCurrentWindow();
+            const size = await win.outerSize();
+            // We set bounds to be 0,0 relative to window, with full size.
+            await invoke('update_character_bounds', {
+                x: 0,
+                y: 0,
+                w: size.width,
+                h: size.height
+            });
+            // console.log(`[Character] Override Interaction: Full Window`);
+            return;
+        }
+
+        const rect = character.getBoundingClientRect();
+        // Send integer bounds
+        await invoke('update_character_bounds', {
+            x: Math.round(rect.x + 20),
+            y: Math.round(rect.y),
+            w: Math.round(rect.width - 20),
+            h: Math.round(rect.height)
+        });
+        // console.log(`[Character] Updated Bounds: ${rect.x}, ${rect.y}, ${rect.width}x${rect.height}`);
+    } catch (e) {
+        console.warn(`[Character] Failed to update bounds:`, e);
+    }
 }
 
 export async function updateVisibilityShortcut(newShortcut: string) {
@@ -194,3 +312,95 @@ export function updateCharacterTheme(theme: string) {
 function getRandomReaction() {
     return clickReactions[Math.floor(Math.random() * clickReactions.length)];
 }
+
+function onCharacterMouseMove(e: MouseEvent) {
+    const now = Date.now();
+    const dx = e.clientX - lastMouseX;
+    lastMouseX = e.clientX;
+
+    // Reset if too slow or stopped
+    if (now - lastWiggleCheck > WIGGLE_TIMEOUT) {
+        wiggleHistory = [];
+    }
+    lastWiggleCheck = now;
+
+    if (Math.abs(dx) > WIGGLE_MIN_SPEED) {
+        // Sign of movement: 1 for right, -1 for left
+        const sign = Math.sign(dx);
+
+        // If history is empty, add current sign
+        if (wiggleHistory.length === 0) {
+            wiggleHistory.push(sign);
+        } else {
+            const lastSign = wiggleHistory[wiggleHistory.length - 1];
+            // If direction changed (flipped sign)
+            if (lastSign !== sign) {
+                wiggleHistory.push(sign);
+            }
+        }
+    }
+
+    // Check Trigger
+    if (wiggleHistory.length >= WIGGLE_THRESHOLD) {
+        console.log('[Character] Wiggle Detected! Shooo!');
+        wiggleHistory = []; // Reset
+        moveToRandomLocation();
+    }
+}
+
+async function moveToRandomLocation() {
+    // Basic Speech
+    showSpeechBubble("Whoa! Okay, I'm moving! 💨");
+    setTimeout(hideSpeechBubble, 2000);
+
+    try {
+        // Get Screen Size
+        const screenW = window.screen.availWidth;
+        const screenH = window.screen.availHeight;
+
+        // Pad from edges
+        const padding = 50;
+        const maxW = screenW - 300;
+        const maxH = screenH - 350;
+
+        // Target Random X/Y
+        const targetX = Math.floor(Math.random() * (maxW - padding)) + padding;
+        const targetY = Math.floor(Math.random() * (maxH - padding)) + padding;
+
+        // Animation Param
+        const startX = window.screenX;
+        const startY = window.screenY;
+        const duration = 800; // ms
+        const startTime = Date.now();
+        const win = getCurrentWindow();
+
+        console.log(`[Character] Jumping to ${targetX}, ${targetY} from ${startX},${startY}`);
+
+        function animate() {
+            const now = Date.now();
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+
+            // Easing: EaseOutCubic (Fast start, slow end)
+            // 1 - (1 - t)^3
+            const ease = 1 - Math.pow(1 - progress, 3);
+
+            const currentX = Math.round(startX + (targetX - startX) * ease);
+            const currentY = Math.round(startY + (targetY - startY) * ease);
+
+            win.setPosition(new LogicalPosition(currentX, currentY)).catch(console.error);
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                console.log('[Character] Move Complete');
+            }
+        }
+
+        requestAnimationFrame(animate);
+
+    } catch (e) {
+        console.error("Failed to move window:", e);
+    }
+}
+
