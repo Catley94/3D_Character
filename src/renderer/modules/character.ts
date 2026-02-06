@@ -1,6 +1,6 @@
 import { unregister, register } from '@tauri-apps/plugin-global-shortcut';
 import { state, defaultShortcuts, CharacterState, CharacterStateValue } from './store';
-import { showSpeechBubble, showChatInput } from './chat';
+import { showSpeechBubble, showChatInput, hideSpeechBubble } from './chat';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
@@ -28,9 +28,19 @@ const clickReactions = [
 // Drag Tracking
 let startPos = { x: 0, y: 0 };
 
+// Wiggle Detection
+let lastWiggleCheck = 0;
+let wiggleHistory: number[] = [];
+let lastMouseX = 0;
+const WIGGLE_THRESHOLD = 4; // Number of direction flips
+const WIGGLE_TIMEOUT = 500; // ms to reset
+const WIGGLE_MIN_SPEED = 5; // Minimum px movement to count as a "move"
+import { LogicalPosition } from '@tauri-apps/api/window'; // ensure imported
+
 export async function initCharacter() {
     character.addEventListener('mousedown', onCharacterMouseDown);
     character.addEventListener('click', onCharacterClick);
+    character.addEventListener('mousemove', onCharacterMouseMove);
 
     updateCharacterTheme(state.config.theme || 'fox');
 
@@ -299,3 +309,68 @@ export function updateCharacterTheme(theme: string) {
 function getRandomReaction() {
     return clickReactions[Math.floor(Math.random() * clickReactions.length)];
 }
+
+function onCharacterMouseMove(e: MouseEvent) {
+    const now = Date.now();
+    const dx = e.clientX - lastMouseX;
+    lastMouseX = e.clientX;
+
+    // Reset if too slow or stopped
+    if (now - lastWiggleCheck > WIGGLE_TIMEOUT) {
+        wiggleHistory = [];
+    }
+    lastWiggleCheck = now;
+
+    if (Math.abs(dx) > WIGGLE_MIN_SPEED) {
+        // Sign of movement: 1 for right, -1 for left
+        const sign = Math.sign(dx);
+
+        // If history is empty, add current sign
+        if (wiggleHistory.length === 0) {
+            wiggleHistory.push(sign);
+        } else {
+            const lastSign = wiggleHistory[wiggleHistory.length - 1];
+            // If direction changed (flipped sign)
+            if (lastSign !== sign) {
+                wiggleHistory.push(sign);
+            }
+        }
+    }
+
+    // Check Trigger
+    if (wiggleHistory.length >= WIGGLE_THRESHOLD) {
+        console.log('[Character] Wiggle Detected! Shooo!');
+        wiggleHistory = []; // Reset
+        moveToRandomLocation();
+    }
+}
+
+async function moveToRandomLocation() {
+    // Basic Speech
+    showSpeechBubble("Whoa! Okay, I'm moving! 💨");
+    setTimeout(hideSpeechBubble, 2000); // Hide after a bit
+    import('./chat').then(m => m.hideSpeechBubble); // Ensure we have access or use existing import
+
+    try {
+        // Get Screen Size (approximate via window.screen)
+        // Note: For multi-monitor, this uses the current monitor.
+        const screenW = window.screen.availWidth;
+        const screenH = window.screen.availHeight;
+
+        // Pad from edges
+        const padding = 50;
+        const maxW = screenW - 300; // Character width area
+        const maxH = screenH - 350; // Character height area
+
+        // Random X/Y
+        const newX = Math.floor(Math.random() * (maxW - padding)) + padding;
+        const newY = Math.floor(Math.random() * (maxH - padding)) + padding;
+
+        console.log(`[Character] Jumping to ${newX}, ${newY}`);
+        await getCurrentWindow().setPosition(new LogicalPosition(newX, newY));
+
+    } catch (e) {
+        console.error("Failed to move window:", e);
+    }
+}
+
