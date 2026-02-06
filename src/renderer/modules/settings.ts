@@ -1,5 +1,5 @@
 import { state, defaultShortcuts } from './store';
-import { updateCharacterTheme, updateDragShortcut, updateVisibilityShortcut } from './character';
+import { updateCharacterTheme, updateDragShortcut, updateVisibilityShortcut, setInteractionOverride } from './character';
 import { showSpeechBubble, hideSpeechBubble, updateChatShortcut } from './chat';
 import { invoke } from '@tauri-apps/api/core';
 import { toggleScreensaver, updateScreensaverShortcut } from './screensaver';
@@ -161,6 +161,7 @@ import { updateWindowSize } from './chat';
 
 async function openSettings() {
     settingsPanel.classList.remove('hidden');
+    setInteractionOverride(true);
     // Resize window to fit settings comfortably
     try {
         await getCurrentWindow().setResizable(true);
@@ -172,6 +173,7 @@ async function openSettings() {
 
 async function closeSettings() {
     settingsPanel.classList.add('hidden');
+    setInteractionOverride(false);
     // Restore window size to character/chat mode
     await updateWindowSize();
     try {

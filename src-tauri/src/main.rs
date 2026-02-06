@@ -82,15 +82,13 @@ fn sync_cursor(state: State<Arc<SharedState>>, x: i32, y: i32) {
 }
 
 #[tauri::command]
-fn update_character_bounds(state: State<Arc<SharedState>>, x: i32, y: i32, w: i32, h: i32) {
+fn update_interactive_bounds(state: State<Arc<SharedState>>, rects: Vec<shared::Rect>) {
+    // eprintln!("[Main] Received {} interactive rects", rects.len());
+    if !rects.is_empty() {
+        // eprintln!("[Main] Rect 0: {:?} (Screen Scale?)", rects[0]);
+    }
     let mut input = state.input_state.lock().unwrap();
-    input.character_rect = Some(shared::Rect {
-        x,
-        y,
-        width: w,
-        height: h,
-    });
-    // println!("[Main] Character Bounds Updated: {:?} ", input.character_rect);
+    input.interactive_rects = rects;
 }
 
 // =============================================================================
@@ -116,7 +114,7 @@ fn main() {
             check_fullscreen,
             check_fullscreen,
             sync_cursor,
-            update_character_bounds
+            update_interactive_bounds
         ]) 
         .setup(|app| {
             let app_handle = app.handle().clone();

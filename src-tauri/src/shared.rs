@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use std::collections::HashSet;
 use std::sync::Mutex;
 
@@ -31,7 +31,7 @@ pub enum KeyCode {
     Unknown,
 }
 
-#[derive(Serialize, Debug, Clone, Copy, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Default)]
 pub struct Rect {
     pub x: i32,
     pub y: i32,
@@ -78,11 +78,8 @@ pub struct InputState {
     pub held_modifiers: HashSet<KeyCode>, 
     pub last_reported_x: i32,
     pub last_reported_y: i32,
-    // Store bounds relative to window, or screen?
-    // Plan: Frontend sends bounds relative to viewport. 
-    // Backend needs to check global mouse vs (Window Pos + Bounds).
-    // Or we store just the local bounds here and let windows_input handle the logic.
-    pub character_rect: Option<Rect>,
+    // Store bounds relative to window
+    pub interactive_rects: Vec<Rect>,
 }
 
 pub struct SharedState {
@@ -99,7 +96,7 @@ impl InputState {
             held_modifiers: HashSet::new(),
             last_reported_x: -1,
             last_reported_y: -1,
-            character_rect: None,
+            interactive_rects: Vec::new(),
         }
     }
 

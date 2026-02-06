@@ -97,14 +97,39 @@ export async function initCharacter() {
     setInterval(updateBounds, 1000);
 }
 
+let overrideInteraction = false;
+
+export function setInteractionOverride(active: boolean) {
+    overrideInteraction = active;
+    updateBounds(); // Immediate update
+}
+
 export async function updateBounds() {
     try {
+        if (overrideInteraction) {
+            // Send large bounds to cover everything (or just window size)
+            // Since backend checks global mouse vs global bounds:
+            // We can send a large rect, or ideally, fetch current window size.
+            // For simplicity, let's fetch current window size.
+            const win = getCurrentWindow();
+            const size = await win.outerSize();
+            // We set bounds to be 0,0 relative to window, with full size.
+            await invoke('update_character_bounds', {
+                x: 0,
+                y: 0,
+                w: size.width,
+                h: size.height
+            });
+            // console.log(`[Character] Override Interaction: Full Window`);
+            return;
+        }
+
         const rect = character.getBoundingClientRect();
         // Send integer bounds
         await invoke('update_character_bounds', {
-            x: Math.round(rect.x),
+            x: Math.round(rect.x + 20),
             y: Math.round(rect.y),
-            w: Math.round(rect.width),
+            w: Math.round(rect.width - 20),
             h: Math.round(rect.height)
         });
         // console.log(`[Character] Updated Bounds: ${rect.x}, ${rect.y}, ${rect.width}x${rect.height}`);

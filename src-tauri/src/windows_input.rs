@@ -139,13 +139,14 @@ unsafe extern "system" fn wnd_proc(
                      // Use absolute OS cursor position
                      input_state.cursor_x = point.x;
                      input_state.cursor_y = point.y;
+                     let interactive_rects = input_state.interactive_rects.clone();
+                     
+                     // Release lock before window operations to avoid deadlocks
+                     drop(input_state);
 
                     // Click-Through Logic
-                    // Check if we have character bounds
-                    if let Some(rect) = input_state.character_rect {
-                        drop(input_state); // Release lock before calling Tauri methods which might deadlock
-                        
-                        if let Some(window) = context.app.get_webview_window("main") {
+                    if !interactive_rects.is_empty() {
+                         if let Some(window) = context.app.get_webview_window("main") {
                              // Get Main Window HWND
                              if let Ok(hwnd_main) = window.hwnd() {
                                  let mut win_rect = RECT::default();
@@ -153,52 +154,56 @@ unsafe extern "system" fn wnd_proc(
                                      let _ = GetWindowRect(HWND(hwnd_main.0 as isize), &mut win_rect);
                                  };
                                  
-                                 // Calculate Global Character Bounds
-                                 // Rect is relative to viewport (client area?)
-                                 // Standard GetWindowRect returns screen coordinates of top-left corner including titlebar/borders?
-                                 // Tauri's window usually frameless.
-                                 // If transparency is on, the client area usually matches.
-                                 // 
-                                 // Wait, `inner_position` vs `outer_position`.
-                                 // We really want the client area top-left.
-                                 // But since we can't easily call async Tauri methods here, we rely on HWND.
-                                 // For a frameless window, GetWindowRect approximates the visual area.
-                                 // 
-                                 // Let's assume window.x + rect.x
                                  let win_x = win_rect.left;
                                  let win_y = win_rect.top;
-                                 
-                                 let char_global_x = win_x + rect.x;
-                                 let char_global_y = win_y + rect.y;
-                                 let char_global_w = rect.width;
-                                 let char_global_h = rect.height;
-                                 
                                  let cursor_x = point.x;
                                  let cursor_y = point.y;
                                  
-                                 let is_over_character = 
-                                     cursor_x >= char_global_x &&
-                                     cursor_x <= char_global_x + char_global_w &&
-                                     cursor_y >= char_global_y &&
-                                     cursor_y <= char_global_y + char_global_h;
-                                     
-                                 // We need to store current state to avoid excessive calls?
-                                 // Tauri's set_ignore_cursor_events handles this gracefully? 
-                                 // It sends a message to the window.
-                                 // It's better to avoid spamming it. 
-                                 // But we don't have "current ignore state" easily accessible.
-                                 // We can add it to context or shared state. 
-                                 // For now, let's just call it.
+                                 let mut is_over_anything = false;
                                  
-                                 // If over character -> Interactive (ignore = false)
-                                 // If NOT over character -> Pass-through (ignore = true)
-                                 let _ = window.set_ignore_cursor_events(!is_over_character);
+                                 for rect in &interactive_rects {
+                                     let global_x = win_x + rect.x;
+                                     let global_y = win_y + rect.y;
+                                     
+                                     if cursor_x >= global_x &&
+                                        cursor_x <= global_x + rect.width &&
+                                        cursor_y >= global_y &&
+                                        cursor_y <= global_y + rect.height 
+                                     {
+                                         is_over_anything = true;
+                                         break;
+                                     }
+                                 }
+
+                                 // REVERTED: Click-through disabled per user request due to stability issues.
+                                 // Forcing window to be interactive at all times.
+                                 // To re-enable, uncomment logic below and ensure frontend sends correct bounds.
+                                 
+                                 /*
+                                 // Debug logging - Use eprintln to ensure it bypasses stdout buffers if any
+                                 eprintln!("[Windows Input] Cursor: {},{} | Global Rect: {},{} {}x{} | Hit: {}", 
+                                    cursor_x, cursor_y, win_x + interactive_rects[0].x, win_y + interactive_rects[0].y, 
+                                    interactive_rects[0].width, interactive_rects[0].height, is_over_anything);
+                                 
+                                 // Update Ignore State
+                                 if let Err(e) = window.set_ignore_cursor_events(!is_over_anything) {
+                                     eprintln!("[Windows Input] Failed to set ignore events: {}", e);
+                                 }
+                                 */
+                                 let _ = window.set_ignore_cursor_events(false); 
                              }
                         }
-                        
-                         // Re-acquire lock to update last_reported if needed
-                         input_state = context.state.input_state.lock().unwrap();
+                    } else {
+                         // Default to Interactive during revert
+                         if let Some(window) = context.app.get_webview_window("main") {
+                             let _ = window.set_ignore_cursor_events(false);
+                         }
                     }
+                     
+                     // Re-acquire lock for event emission
+                     let mut input_state = context.state.input_state.lock().unwrap();
+                     
+                     // Only emit if changed?
                      
                      // Only emit if changed?
                      if input_state.cursor_x != input_state.last_reported_x || input_state.cursor_y != input_state.last_reported_y {
