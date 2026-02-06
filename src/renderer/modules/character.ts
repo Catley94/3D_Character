@@ -32,10 +32,13 @@ let startPos = { x: 0, y: 0 };
 let lastWiggleCheck = 0;
 let wiggleHistory: number[] = [];
 let lastMouseX = 0;
+let speechBubbleTimeout: number | undefined; // Store timeout ID
 const WIGGLE_THRESHOLD = 4; // Number of direction flips
 const WIGGLE_TIMEOUT = 500; // ms to reset
 const WIGGLE_MIN_SPEED = 5; // Minimum px movement to count as a "move"
-import { LogicalPosition } from '@tauri-apps/api/window'; // ensure imported
+import { LogicalPosition } from '@tauri-apps/api/window';
+
+
 
 export async function initCharacter() {
     character.addEventListener('mousedown', onCharacterMouseDown);
