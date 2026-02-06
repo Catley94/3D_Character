@@ -348,26 +348,53 @@ function onCharacterMouseMove(e: MouseEvent) {
 async function moveToRandomLocation() {
     // Basic Speech
     showSpeechBubble("Whoa! Okay, I'm moving! 💨");
-    setTimeout(hideSpeechBubble, 2000); // Hide after a bit
-    import('./chat').then(m => m.hideSpeechBubble); // Ensure we have access or use existing import
+    setTimeout(hideSpeechBubble, 2000);
 
     try {
-        // Get Screen Size (approximate via window.screen)
-        // Note: For multi-monitor, this uses the current monitor.
+        // Get Screen Size
         const screenW = window.screen.availWidth;
         const screenH = window.screen.availHeight;
 
         // Pad from edges
         const padding = 50;
-        const maxW = screenW - 300; // Character width area
-        const maxH = screenH - 350; // Character height area
+        const maxW = screenW - 300;
+        const maxH = screenH - 350;
 
-        // Random X/Y
-        const newX = Math.floor(Math.random() * (maxW - padding)) + padding;
-        const newY = Math.floor(Math.random() * (maxH - padding)) + padding;
+        // Target Random X/Y
+        const targetX = Math.floor(Math.random() * (maxW - padding)) + padding;
+        const targetY = Math.floor(Math.random() * (maxH - padding)) + padding;
 
-        console.log(`[Character] Jumping to ${newX}, ${newY}`);
-        await getCurrentWindow().setPosition(new LogicalPosition(newX, newY));
+        // Animation Param
+        const startX = window.screenX;
+        const startY = window.screenY;
+        const duration = 800; // ms
+        const startTime = Date.now();
+        const win = getCurrentWindow();
+
+        console.log(`[Character] Jumping to ${targetX}, ${targetY} from ${startX},${startY}`);
+
+        function animate() {
+            const now = Date.now();
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+
+            // Easing: EaseOutCubic (Fast start, slow end)
+            // 1 - (1 - t)^3
+            const ease = 1 - Math.pow(1 - progress, 3);
+
+            const currentX = Math.round(startX + (targetX - startX) * ease);
+            const currentY = Math.round(startY + (targetY - startY) * ease);
+
+            win.setPosition(new LogicalPosition(currentX, currentY)).catch(console.error);
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                console.log('[Character] Move Complete');
+            }
+        }
+
+        requestAnimationFrame(animate);
 
     } catch (e) {
         console.error("Failed to move window:", e);
