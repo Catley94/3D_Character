@@ -8,18 +8,10 @@ use std::thread;
 use tauri::{AppHandle, Manager, State};
 
 // Modules
+mod input;
 mod shared;
-#[cfg(target_os = "linux")]
-mod linux_input;
-#[cfg(target_os = "windows")]
-mod windows_input;
 
 use shared::{InputState, SharedState};
-
-#[cfg(target_os = "linux")]
-use linux_input as input;
-#[cfg(target_os = "windows")]
-use windows_input as input;
 
 // =============================================================================
 // Config Management
@@ -107,7 +99,7 @@ fn check_fullscreen() -> bool {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_log::Builder::default().build()) 
+        .plugin(tauri_plugin_log::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
             save_config,
             load_config,
@@ -115,7 +107,7 @@ fn main() {
             check_fullscreen,
             sync_cursor,
             update_interactive_bounds
-        ]) 
+        ])
         .setup(|app| {
             let app_handle = app.handle().clone();
 

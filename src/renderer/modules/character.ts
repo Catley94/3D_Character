@@ -1,6 +1,6 @@
 import { unregister, register } from '@tauri-apps/plugin-global-shortcut';
 import { state, defaultShortcuts, CharacterState, CharacterStateValue } from './store';
-import { showSpeechBubble, showChatInput, hideSpeechBubble } from './chat';
+import { showSpeechBubble, showChatInput, hideSpeechBubble, isSpeechBubbleVisible } from './chat';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
@@ -350,8 +350,12 @@ function onCharacterMouseMove(e: MouseEvent) {
 
 async function moveToRandomLocation() {
     // Basic Speech
-    showSpeechBubble("Whoa! Okay, I'm moving! 💨");
-    setTimeout(hideSpeechBubble, 2000);
+    if (!isSpeechBubbleVisible()) {
+        showSpeechBubble("Whoa! Okay, I'm moving! 💨");
+        setTimeout(hideSpeechBubble, 2000);
+    } else {
+        console.log('[Character] Wiggle move, but preserving existing speech bubble.');
+    }
 
     try {
         // Get Screen Size

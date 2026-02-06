@@ -117,6 +117,10 @@ export function hideSpeechBubble() {
     updateWindowSize();
 }
 
+export function isSpeechBubbleVisible() {
+    return !speechBubble.classList.contains('hidden');
+}
+
 // ===== Window Sizing Helpers =====
 
 function lockWindow() {
