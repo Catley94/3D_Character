@@ -102,11 +102,16 @@ export async function updateChatShortcut(newShortcut: string) {
 
 export async function showSpeechBubble(text: string, animate = true) {
     speechBubble.classList.remove('hidden');
+    console.log('[Chat] Speech bubble shown, triggering resize...');
+    // Force immediate resize calculation now that element is visible
+    await updateWindowSize();
 
     if (animate) {
         await typeText(text);
     } else {
         bubbleText.textContent = text;
+        // updateWindowSize is already called above, but typing/text change might need another pass?
+        // Let's keep a safety check after a short delay
         setTimeout(updateWindowSize, 50);
     }
 }
@@ -190,10 +195,14 @@ export async function updateWindowSize() {
         const currentSize = await appWindow.outerSize();
 
         console.log(`[Resize] Target Size: ${targetWidth}x${targetHeight}`);
+        console.log(`[Resize] Current Size: ${currentSize.width}x${currentSize.height}`);
 
         // Only resize, don't move. Top-Left stays fixed.
         if (currentSize.width !== targetWidth || currentSize.height !== targetHeight) {
+            console.log(`[Resize] Applying resize to ${targetWidth}x${targetHeight}`);
             await appWindow.setSize(new LogicalSize(targetWidth, targetHeight));
+        } else {
+            console.log('[Resize] Size already correct, skipping.');
         }
 
     } catch (e) {

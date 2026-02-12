@@ -136,8 +136,30 @@ fn sync_cursor(state: State<Arc<SharedState>>, x: i32, y: i32) {
 /// ```
 #[tauri::command]
 fn update_interactive_bounds(state: State<Arc<SharedState>>, rects: Vec<shared::Rect>) {
-    let mut input = state.input_state.lock().unwrap();
-    input.interactive_rects = rects;
+    let mut input_guard = state.input_state.lock().unwrap();
+    input_guard.interactive_rects = rects;
+}
+
+/// Updates the specific bounds of the character for click detection.
+/// This corresponds to the `update_character_bounds` command called by the frontend.
+///
+/// # Frontend Usage
+/// ```javascript
+/// await invoke('update_character_bounds', { x: 100, y: 100, w: 50, h: 50 });
+/// ```
+#[tauri::command]
+fn update_character_bounds(state: State<Arc<SharedState>>, x: i32, y: i32, w: i32, h: i32) {
+    let mut input_guard = state.input_state.lock().unwrap();
+    // For now, we just replace the interactive rects with this single character rect.
+    // In the future, we might want to support multiple rects via `update_interactive_bounds`
+    // combined with this, or store them separately.
+    // Based on the frontend logic, `update_character_bounds` is the primary way the character receives clicks.
+    input_guard.interactive_rects = vec![shared::Rect {
+        x,
+        y,
+        width: w,
+        height: h,
+    }];
 }
 
 // =============================================================================
@@ -172,6 +194,26 @@ fn check_fullscreen() -> bool {
 // =============================================================================
 
 fn main() {
+    // =========================================================
+    // Wayland Fallback: Force XWayland if layer-shell unsupported
+    // =========================================================
+    // On Wayland, `set_always_on_top` is silently ignored. The proper fix
+    // is gtk-layer-shell, but not all compositors support it (e.g. Pantheon's
+    // Gala). In those cases, we force the X11/XWayland backend where
+    // `set_always_on_top` works reliably. This MUST run before GTK init.
+    #[cfg(target_os = "linux")]
+    {
+        if std::env::var("GDK_BACKEND").is_err() {
+            // Only override if the user hasn't explicitly set GDK_BACKEND
+            let session_type = std::env::var("XDG_SESSION_TYPE").unwrap_or_default();
+            if session_type == "wayland" {
+                println!("[Backend] Wayland session detected. Forcing X11 backend for always-on-top support.");
+                println!("[Backend] (Set GDK_BACKEND=wayland to override if your compositor supports layer-shell)");
+                std::env::set_var("GDK_BACKEND", "x11");
+            }
+        }
+    }
+
     tauri::Builder::default()
         // Plugin: Global keyboard shortcuts (Meta+Shift+F, etc.)
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -183,7 +225,8 @@ fn main() {
             load_config,
             check_fullscreen,
             sync_cursor,
-            update_interactive_bounds
+            update_interactive_bounds,
+            update_character_bounds
         ])
         // Setup hook: Runs once before the main window is created
         .setup(|app| {
@@ -200,10 +243,11 @@ fn main() {
             });
 
             // =========================================================
-            // Platform-Specific Window Fixes
+            // Enforce Always-on-Top
             // =========================================================
-            // On Linux, the window manager sometimes ignores the "always on top"
-            // setting from tauri.conf.json in production builds. We enforce it here.
+            // On Wayland, the XWayland fallback at the top of main() ensures
+            // we're running with GDK_BACKEND=x11, where this API works.
+            // On native X11 sessions, it works out of the box.
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_always_on_top(true);
             }

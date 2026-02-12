@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "tauri:dev": "tauri dev",
+    "tauri:dev:linux": "GDK_BACKEND=x11 tauri dev",
     "build": "tsc && vite build",
     "tauri:build": "tauri build",
     "preview": "vite preview",

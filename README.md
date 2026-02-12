@@ -24,6 +24,7 @@ A cute, interactive AI companion that lives on your desktop. Foxy (or your custo
     sudo usermod -a -G input $USER
     # You must LOG OUT and LOG IN again for this to take effect!
     ```
+    > **Note:** On Wayland compositors (e.g. Pantheon/Gala, GNOME), the app automatically falls back to XWayland mode for reliable "always on top" behavior.
 
 ### Shortcuts
 - **`Meta + Shift + F`** (Super+Shift+F): **Toggle Chat**. Show/Hide the chat window.
@@ -326,11 +327,12 @@ The speech bubble visibility is managed directly via DOM class (`hidden`). We ad
 ### The Challenge
 - **Wayland Security**: Apps cannot see global cursor or detect shortcuts when unfocused
 - **Click-Through**: Standard windowing APIs fail for overlay apps
+- **Always on Top**: Wayland compositors silently ignore `set_always_on_top()` — it's not part of the Wayland protocol
 
 ### Our Solution
-1. **Raw Input Reading**: `/dev/input/event*` and `/dev/input/mice`
-2. **Global Cursor Tracking**: Track position even on Wayland
-3. **Shortcut Detection**: Detect `Meta+Shift+F/D/S` globally
+1. **Raw Input Reading**: `/dev/input/event*` for global cursor tracking and shortcuts
+2. **Always-on-Top Strategy**: On Wayland sessions, the app automatically forces `GDK_BACKEND=x11` (XWayland) where `set_always_on_top` works reliably
+3. **Shortcut Detection**: Detect `Meta+Shift+F/D/S` globally via `/dev/input`
 4. **Event Emission**: Send events to frontend via Tauri IPC
 
 ---
@@ -339,10 +341,10 @@ The speech bubble visibility is managed directly via DOM class (`hidden`). We ad
 
 ### Quick Start Commands
 ```bash
-# Development (hot-reload)
+# Development (hot-reload, auto-sets GDK_BACKEND=x11 on Linux)
 npm run tauri:dev
 
-# Production build
+# Production build (auto-sets GDK_BACKEND=x11 on Linux)
 npm run tauri:build
 
 # TypeScript type check

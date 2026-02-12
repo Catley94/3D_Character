@@ -39,6 +39,11 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "linux": {
+      "deb": {
+        "desktopTemplate": "templates/app.desktop"
+      }
+    },
     "windows": {
       "nsis": {
         "installMode": "currentUser"
