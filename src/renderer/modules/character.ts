@@ -351,7 +351,7 @@ function onCharacterMouseMove(e: MouseEvent) {
 async function moveToRandomLocation() {
     // Basic Speech
     if (!isSpeechBubbleVisible()) {
-        showSpeechBubble("Whoa! Okay, I'm moving! 💨");
+        showSpeechBubble("Whoa! What's over here? 💨");
         setTimeout(hideSpeechBubble, 2000);
     } else {
         console.log('[Character] Wiggle move, but preserving existing speech bubble.');
