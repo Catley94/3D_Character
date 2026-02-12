@@ -11,6 +11,12 @@ export const REACTIONS: Reaction[] = [
     { text: "*Yip!* You found me!", characters: ['fox'], traits: ['playful'] },
     { text: "Fox on the box! How can I help?", characters: ['fox'], traits: ['helpful'] },
 
+    // --- WOLF SPECIFIC ---
+    { text: "*Howls softly* The pack is here.", characters: ['wolf'], traits: ['mysterious'] },
+    { text: "Moonlight guides us.", characters: ['wolf'], traits: ['wise'] },
+    { text: "I smell... data.", characters: ['wolf'], traits: ['playful'] },
+
+
     // --- GENERIC PLAYFUL ---
     { text: "*stretches* ready for adventure!", characters: ['*'], traits: ['playful'] },
     { text: "You rang? ☎️ ...wait, I don't have a phone.", characters: ['*'], traits: ['playful'] },
