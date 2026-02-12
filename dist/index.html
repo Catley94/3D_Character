@@ -5,8 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Character Assistant</title>
-  <script type="module" crossorigin src="/assets/index-VdfmX-TE.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-stt7Yvyf.css">
+  <script type="module" crossorigin src="/assets/index-F9vF0GU2.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-D9nPyrkA.css">
 </head>
 
 <body>
@@ -31,7 +31,7 @@
       <div id="bubble-content">
         <p id="bubble-text"></p>
       </div>
-      <div id="bubble-tail"></div>
+      <!-- <div id="bubble-tail"></div> -->
     </div>
 
     <!-- Chat Input -->
@@ -68,10 +68,6 @@
         <label for="gemini-model">Gemini Model</label>
         <select id="gemini-model">
           <option value="gemini-2.5-flash">Gemini 2.5 Flash (new)</option>
-          <option value="gemini-2.0-flash">Gemini 2.0 Flash (fast)</option>
-          <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite (faster)</option>
-          <option value="gemini-1.5-pro">Gemini 1.5 Pro (capable)</option>
-          <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
           <option value="custom">Custom Model ID...</option>
         </select>
         <input type="text" id="custom-model-input" placeholder="e.g. gemini-1.5-pro-002" class="hidden"
@@ -105,7 +101,10 @@
         </div>
       </div>
 
-      <label><input type="checkbox" id="debug-mode"> 🐛 Debug Mode (show window border)</label>
+      <div class="setting-group">
+        <label><input type="checkbox" id="debug-mode"> 🐛 Debug Mode (show window border)</label>
+      </div>
+
 
       <div class="setting-group" id="shortcuts-section">
         <h3>⌨️ Keyboard Shortcuts</h3>
