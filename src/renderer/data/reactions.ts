@@ -19,7 +19,6 @@ export const REACTIONS: Reaction[] = [
     { text: "Did you know I can see everything on your desktop? 👀 Just kidding!", characters: ['*'], traits: ['playful'] },
     { text: "Keep clicking and I might do a backflip! (Okay, I can't yet)", characters: ['*'], traits: ['playful'] },
     { text: "Warning: Excessive cuteness detected in this area! ⚠️", characters: ['*'], traits: ['playful'] },
-    { text: "If you were a file, you'd be a 'cute.txt'! 📄", characters: ['*'], traits: ['playful'] },
 
     // --- GENERIC SUPPORTIVE ---
     { text: "Just checking in! You're doing great! 🌟", characters: ['*'], traits: ['emotional_support'] },
