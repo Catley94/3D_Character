@@ -42,6 +42,13 @@ export function initSettings() {
 
     closeSettingsBtn.addEventListener('click', closeSettings);
 
+    // Close on Escape key
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && isSettingsOpen()) {
+            closeSettings();
+        }
+    });
+
     // Close when clicking outside
     settingsPanel.addEventListener('click', (e) => {
         if (e.target === settingsPanel) closeSettings();
