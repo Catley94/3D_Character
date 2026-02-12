@@ -112,7 +112,7 @@ export function applyConfig(cfg: any) {
     apiProvider.value = cfg.provider || 'gemini';
     apiKey.value = cfg.geminiApiKey || cfg.apiKey || ''; // Support both keys
 
-    const savedModel = cfg.geminiModel || 'gemini-2.0-flash';
+    const savedModel = cfg.geminiModel || DEFAULT_GEMINI_MODEL;
     const isCustom = !Array.from(geminiModel.options).some(opt => opt.value === savedModel);
 
     if (isCustom) {
@@ -158,6 +158,7 @@ export function applyConfig(cfg: any) {
 
 import { LogicalSize } from '@tauri-apps/api/window';
 import { updateWindowSize } from './chat';
+import { DEFAULT_GEMINI_MODEL } from '../constants';
 
 async function openSettings() {
     settingsPanel.classList.remove('hidden');

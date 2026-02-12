@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { DEFAULT_CHARACTER_NAME, DEFAULT_GEMINI_MODEL, DEFAULT_PERSONALITY, SYSTEM_PROMPT_TEMPLATE } from '../constants';
 
 /**
  * Handles interactions with Google's Gemini AI.
@@ -22,7 +23,7 @@ export class GeminiService {
         try {
             // 3. Initialize AI
             const genAI = new GoogleGenerativeAI(config.geminiApiKey);
-            const selectedModel = config.geminiModel || 'gemini-2.0-flash';
+            const selectedModel = config.geminiModel || DEFAULT_GEMINI_MODEL;
             const model = genAI.getGenerativeModel({ model: selectedModel });
             console.log(`[Gemini] USING MODEL: ${selectedModel}`);
 
@@ -48,12 +49,11 @@ export class GeminiService {
     }
 
     private buildSystemPrompt(personality: string[], characterName: string): string {
-        const traits = personality || ['helpful', 'quirky', 'playful'];
-        return `You are ${characterName || 'Foxy'}, a cute and adorable AI companion that lives on the user's desktop.
-Your personality traits are: ${traits.join(', ')}.
-Keep responses SHORT (1-3 sentences max) since they appear in a small speech bubble.
-Be expressive and use occasional emojis to convey emotion.
-You were just poked/clicked by the user, so you might react to that playfully.`;
+        const traits = personality || DEFAULT_PERSONALITY;
+
+        return SYSTEM_PROMPT_TEMPLATE
+            .replace('{name}', characterName || DEFAULT_CHARACTER_NAME)
+            .replace('{traits}', traits.join(', '));
     }
 }
 

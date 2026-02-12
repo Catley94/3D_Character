@@ -65,6 +65,7 @@ async function init() {
     // %APPDATA%\com.sam.ai-character-assistant\config.json (Windows)
     let config;
     try {
+        // Calling Rust function to load config
         config = await invoke('load_config');
         console.log('[Renderer] Loaded config:', config);
     } catch (e) {
