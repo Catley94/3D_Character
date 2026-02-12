@@ -214,6 +214,7 @@ body.is-dragging #character {
   max-width: 475px;
   min-width: 150px;
   background: var(--bubble-bg);
+  border: 1px solid black;
   border-radius: 16px;
   padding: 12px 28px 12px 16px;
   /* Extra right padding for dismiss button */
@@ -222,6 +223,8 @@ body.is-dragging #character {
   margin-bottom: 10px;
   flex-shrink: 0;
 }
+
+
 
 /* Dismiss button */
 #bubble-dismiss {
@@ -288,11 +291,26 @@ body.is-dragging #character {
 
 #bubble-tail {
   position: absolute;
-  top: 0;
+  top: -2px;
+  /* Pull up to sit on border */
   left: 50%;
   transform: translate(-50%, -100%);
   width: 0;
   height: 0;
+  /* Outer Black Triangle (Outline) */
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-bottom: 12px solid black;
+  z-index: 1;
+}
+
+/* Inner White Triangle */
+#bubble-tail::after {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 2px;
+  /* Shift down to reveal black outline at top */
   border-left: 10px solid transparent;
   border-right: 10px solid transparent;
   border-bottom: 10px solid var(--bubble-bg);
