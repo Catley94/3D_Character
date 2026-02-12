@@ -1,11 +1,10 @@
 import { unregister, register } from '@tauri-apps/plugin-global-shortcut';
+import { getRandomReaction } from '../data/reactions';
 import { state, defaultShortcuts, CharacterState, CharacterStateValue } from './store';
 import { showSpeechBubble, showChatInput, hideSpeechBubble, isSpeechBubbleVisible } from './chat';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
-
-// DOM Elements
 
 // DOM Elements
 const character = document.getElementById('character') as HTMLDivElement;
@@ -17,13 +16,7 @@ const chatInputContainer = document.getElementById('chat-input-container') as HT
 let currentToggleShortcut = '';
 
 // Constants
-const clickReactions = [
-    "Oh! I felt that! 😊 How're you doing?",
-    "Hey there! *wiggles ears* What's up?",
-    "Ooh, a poke! Got something on your mind?",
-    "*blinks* Hello, friend! Need me?",
-    "Ah! You found me! 🦊 What can I do for you?"
-];
+// clickReactions moved to data/reactions.ts
 
 // Drag Tracking
 let startPos = { x: 0, y: 0 };
@@ -268,7 +261,8 @@ export function handleCharacterClick() {
     setState(CharacterState.CLICKED);
 
     // Show reaction
-    showSpeechBubble(getRandomReaction());
+    const reaction = getRandomReaction(state.config.theme || 'fox', state.config.personality || []);
+    showSpeechBubble(reaction);
 
     // After reaction, show chat input
     setTimeout(() => {
@@ -307,10 +301,6 @@ export function setState(newState: CharacterStateValue) {
 export function updateCharacterTheme(theme: string) {
     const basePath = `themes/${theme}`;
     characterImg.src = `${basePath}/idle.png`;
-}
-
-function getRandomReaction() {
-    return clickReactions[Math.floor(Math.random() * clickReactions.length)];
 }
 
 function onCharacterMouseMove(e: MouseEvent) {
