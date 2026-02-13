@@ -37,7 +37,8 @@ export const CharacterState = {
     IDLE: 'idle',           // Character is doing nothing, waiting for interaction
     CLICKED: 'clicked',     // Character was just clicked, showing reaction
     LISTENING: 'listening', // Character is waiting for user input
-    TALKING: 'talking'      // Character is speaking/typing a response
+    TALKING: 'talking',      // Character is speaking/typing a response
+    TRANSITION: 'transition' // Short state between TALKING and IDLE
 } as const;
 
 export type CharacterStateValue = typeof CharacterState[keyof typeof CharacterState];

@@ -23,6 +23,7 @@ const CONTENT_WIDTH = 320;
 // Timeout constants
 const TYPING_TIMEOUT_MS = 15000;
 const RESPONSE_TIMEOUT_MS = 60000;
+const TRANSITION_DURATION_MS = 500;
 
 let idleTimeout: NodeJS.Timeout | null = null;
 let bubbleTimeout: NodeJS.Timeout | null = null;
@@ -356,9 +357,16 @@ function clearBubbleTimeout() {
 }
 
 function dismissBubble() {
-    // If we dismiss manually, we should probably reset everything to idle
-    // so the character isn't stuck in "Listening" or "Talking"
-    returnToIdle(null);
+    // When manually dismissed, transition through TRANSITION state
+    hideChatInput();
+    hideSpeechBubble();
+    clearBubbleTimeout();
+
+    // Trigger transition: TALKING -> TRANSITION -> IDLE
+    setState(CharacterState.TRANSITION);
+    setTimeout(() => {
+        setState(CharacterState.IDLE);
+    }, TRANSITION_DURATION_MS);
 }
 
 function returnToIdle(message: string | null) {
@@ -373,11 +381,18 @@ function returnToIdle(message: string | null) {
 }
 
 function goIdleKeepBubble() {
-    setState(CharacterState.IDLE);
+    // Keep TALKING state while bubble is visible
+    // Transition will happen when bubble is hidden
     clearBubbleTimeout();
     bubbleTimeout = setTimeout(() => {
         hideSpeechBubble();
         hideChatInput();
+
+        // Trigger transition: TALKING -> TRANSITION -> IDLE
+        setState(CharacterState.TRANSITION);
+        setTimeout(() => {
+            setState(CharacterState.IDLE);
+        }, TRANSITION_DURATION_MS);
     }, RESPONSE_TIMEOUT_MS);
 }
 

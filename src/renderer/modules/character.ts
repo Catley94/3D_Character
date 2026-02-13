@@ -303,6 +303,9 @@ export async function setState(newState: CharacterStateValue) {
             case CharacterState.TALKING:
                 characterImg.src = `${basePath}/talking.png?t=${timestamp}`;
                 break;
+            case CharacterState.TRANSITION:
+                characterImg.src = `${basePath}/transition.png?t=${timestamp}`;
+                break;
             default:
                 characterImg.src = `${basePath}/idle.png`;
         }
@@ -344,6 +347,7 @@ export async function setState(newState: CharacterStateValue) {
                 case CharacterState.CLICKED: filename = 'clicked.png'; break;
                 case CharacterState.LISTENING: filename = 'listening.png'; break;
                 case CharacterState.TALKING: filename = 'talking.png'; break;
+                case CharacterState.TRANSITION: filename = 'transition.png'; break;
             }
 
             const fullPath = `${themePath}${separator}${filename}`;
