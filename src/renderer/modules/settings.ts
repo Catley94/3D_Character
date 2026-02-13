@@ -1,5 +1,6 @@
 import { state, defaultShortcuts } from './store';
-import { THEME_NICKNAMES } from '../constants';
+import { THEME_NICKNAMES, DEFAULT_OLLAMA_URL, DEFAULT_OLLAMA_MODEL } from '../constants';
+import { OllamaService } from '../services/ollama';
 
 import { updateCharacterTheme, updateDragShortcut, updateVisibilityShortcut, setInteractionOverride } from './character';
 import { showSpeechBubble, hideSpeechBubble, updateChatShortcut } from './chat';
@@ -27,6 +28,18 @@ const characterName = document.getElementById('character-name') as HTMLInputElem
 const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
 const personalityCheckboxes = document.querySelectorAll('#personality-traits input') as NodeListOf<HTMLInputElement>;
 const debugModeCheckbox = document.getElementById('debug-mode') as HTMLInputElement;
+
+// Provider-specific setting containers
+const geminiSettings = document.getElementById('gemini-settings') as HTMLDivElement;
+const ollamaSettings = document.getElementById('ollama-settings') as HTMLDivElement;
+
+// Ollama-specific form elements
+const ollamaUrl = document.getElementById('ollama-url') as HTMLInputElement;
+const ollamaModel = document.getElementById('ollama-model') as HTMLSelectElement;
+const ollamaCustomModel = document.getElementById('ollama-custom-model') as HTMLInputElement;
+const refreshOllamaModelsBtn = document.getElementById('refresh-ollama-models') as HTMLButtonElement;
+const testOllamaConnectionBtn = document.getElementById('test-ollama-connection') as HTMLButtonElement;
+const ollamaConnectionStatus = document.getElementById('ollama-connection-status') as HTMLParagraphElement;
 
 // Shortcut Inputs
 const shortcutInputs = {
@@ -58,7 +71,10 @@ export function initSettings() {
 
     saveSettingsBtn.addEventListener('click', saveSettings);
 
-
+    // Provider change: toggle Gemini vs Ollama settings visibility
+    apiProvider.addEventListener('change', () => {
+        updateProviderUI(apiProvider.value);
+    });
 
     geminiModel.addEventListener('change', () => {
         if (geminiModel.value === 'custom') {
@@ -67,6 +83,20 @@ export function initSettings() {
         } else {
             customModelInput.classList.add('hidden');
         }
+    });
+
+    // Ollama: Refresh models button
+    refreshOllamaModelsBtn.addEventListener('click', () => {
+        fetchOllamaModels(ollamaUrl.value || DEFAULT_OLLAMA_URL);
+    });
+
+    // Ollama: Test connection button
+    testOllamaConnectionBtn.addEventListener('click', async () => {
+        ollamaConnectionStatus.textContent = 'Testing...';
+        ollamaConnectionStatus.style.color = '#aaa';
+        const result = await OllamaService.testConnection(ollamaUrl.value || DEFAULT_OLLAMA_URL);
+        ollamaConnectionStatus.textContent = result.message;
+        ollamaConnectionStatus.style.color = result.success ? '#10b981' : '#ef4444';
     });
 
     // Theme Change Listener - Auto-update name if it's generic
@@ -161,11 +191,88 @@ async function loadExternalThemes() {
     }
 }
 
+/**
+ * Toggle the visibility of provider-specific settings sections.
+ * Shows Gemini fields when 'gemini' is selected, Ollama fields when 'ollama'.
+ *
+ * @param provider - The selected provider value ('gemini' or 'ollama')
+ */
+function updateProviderUI(provider: string) {
+    if (provider === 'ollama') {
+        geminiSettings.classList.add('hidden');
+        ollamaSettings.classList.remove('hidden');
+        // Auto-fetch models when switching to Ollama
+        fetchOllamaModels(ollamaUrl.value || DEFAULT_OLLAMA_URL);
+    } else {
+        geminiSettings.classList.remove('hidden');
+        ollamaSettings.classList.add('hidden');
+    }
+}
+
+/**
+ * Fetch available models from the Ollama instance and populate the dropdown.
+ *
+ * @param url - The base URL of the Ollama instance
+ */
+async function fetchOllamaModels(url: string) {
+    refreshOllamaModelsBtn.textContent = '⏳';
+    const models = await OllamaService.listModels(url);
+    refreshOllamaModelsBtn.textContent = '🔄';
+
+    // Preserve current selection
+    const currentValue = ollamaModel.value;
+
+    // Clear existing options
+    ollamaModel.innerHTML = '';
+
+    if (models.length > 0) {
+        // Add discovered models
+        models.forEach(name => {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            ollamaModel.appendChild(opt);
+        });
+    } else {
+        // Fallback if no models found
+        const opt = document.createElement('option');
+        opt.value = DEFAULT_OLLAMA_MODEL;
+        opt.textContent = `${DEFAULT_OLLAMA_MODEL} (default)`;
+        ollamaModel.appendChild(opt);
+    }
+
+    // Add "Custom..." option at the end
+    const customOpt = document.createElement('option');
+    customOpt.value = 'custom';
+    customOpt.textContent = 'Custom Model ID...';
+    ollamaModel.appendChild(customOpt);
+
+    // Restore previous selection if still available
+    if (Array.from(ollamaModel.options).some(opt => opt.value === currentValue)) {
+        ollamaModel.value = currentValue;
+    }
+
+    // Handle custom model input toggle
+    ollamaModel.addEventListener('change', () => {
+        if (ollamaModel.value === 'custom') {
+            ollamaCustomModel.classList.remove('hidden');
+            ollamaCustomModel.focus();
+        } else {
+            ollamaCustomModel.classList.add('hidden');
+        }
+    });
+}
+
 export function applyConfig(cfg: any) {
     console.log('[Settings] Applying config:', cfg);
     state.config = cfg; // Update shared state
 
-    apiProvider.value = cfg.provider || 'gemini';
+    // Provider selection
+    const provider = cfg.provider || 'gemini';
+    apiProvider.value = provider;
+    updateProviderUI(provider);
+
+    // Gemini settings
     apiKey.value = cfg.geminiApiKey || cfg.apiKey || ''; // Support both keys
 
     const savedModel = cfg.geminiModel || DEFAULT_GEMINI_MODEL;
@@ -178,6 +285,21 @@ export function applyConfig(cfg: any) {
     } else {
         geminiModel.value = savedModel;
         customModelInput.classList.add('hidden');
+    }
+
+    // Ollama settings
+    ollamaUrl.value = cfg.ollamaUrl || DEFAULT_OLLAMA_URL;
+    // Set Ollama model (if available in dropdown, otherwise treat as custom)
+    const savedOllamaModel = cfg.ollamaModel || DEFAULT_OLLAMA_MODEL;
+    if (Array.from(ollamaModel.options).some(opt => opt.value === savedOllamaModel)) {
+        ollamaModel.value = savedOllamaModel;
+    } else {
+        // Add it as an option and select it
+        const opt = document.createElement('option');
+        opt.value = savedOllamaModel;
+        opt.textContent = savedOllamaModel;
+        ollamaModel.insertBefore(opt, ollamaModel.firstChild);
+        ollamaModel.value = savedOllamaModel;
     }
 
     characterName.value = cfg.characterName || 'Foxy';
@@ -246,15 +368,27 @@ async function saveSettings() {
         if (cb.checked) selectedPersonality.push(cb.value);
     });
 
-    let modelToSave = geminiModel.value;
-    if (modelToSave === 'custom') {
-        modelToSave = customModelInput.value.trim() || 'gemini-2.0-flash';
+    // Resolve Gemini model (handle custom input)
+    let geminiModelToSave = geminiModel.value;
+    if (geminiModelToSave === 'custom') {
+        geminiModelToSave = customModelInput.value.trim() || 'gemini-2.0-flash';
+    }
+
+    // Resolve Ollama model (handle custom input)
+    let ollamaModelToSave = ollamaModel.value;
+    if (ollamaModelToSave === 'custom') {
+        ollamaModelToSave = ollamaCustomModel.value.trim() || DEFAULT_OLLAMA_MODEL;
     }
 
     const newConfig = {
         provider: apiProvider.value,
-        geminiApiKey: apiKey.value, // Use specific key
-        geminiModel: modelToSave,
+        // Gemini config
+        geminiApiKey: apiKey.value,
+        geminiModel: geminiModelToSave,
+        // Ollama config
+        ollamaUrl: ollamaUrl.value.trim() || DEFAULT_OLLAMA_URL,
+        ollamaModel: ollamaModelToSave,
+        // Shared config
         characterName: characterName.value,
         theme: themeSelect.value,
         personality: selectedPersonality,

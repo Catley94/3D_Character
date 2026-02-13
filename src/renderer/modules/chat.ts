@@ -1,6 +1,7 @@
 import { state, CharacterState, defaultShortcuts } from './store';
 import { setState } from './character';
 import { geminiService } from '../services/gemini';
+import { ollamaService } from '../services/ollama';
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { unregister, register } from '@tauri-apps/plugin-global-shortcut';
 
@@ -410,7 +411,13 @@ async function sendMessage() {
     showSpeechBubble('Hmm, let me think... 🤔', false);
 
     try {
-        const result = await geminiService.generateResponse(message, state.config);
+        // Route to the correct AI provider based on config
+        const provider = state.config.provider || 'gemini';
+        console.log(`[Chat] Using provider: ${provider}`);
+
+        const result = provider === 'ollama'
+            ? await ollamaService.generateResponse(message, state.config)
+            : await geminiService.generateResponse(message, state.config);
 
         if (result.error) {
             setState(CharacterState.TALKING);
