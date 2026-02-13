@@ -305,12 +305,19 @@ fn main() {
             });
 
             // =========================================================
-            // Windows-Specific Settings
+            // Platform-Specific Settings
             // =========================================================
-            // On Windows, we disable the window shadow for a cleaner overlay look
+            // On Windows and macOS, we disable the window shadow for a cleaner overlay look
             #[cfg(target_os = "windows")]
             {
                 use tauri::Manager;
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.set_shadow(false);
+                }
+            }
+
+            #[cfg(target_os = "macos")]
+            {
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.set_shadow(false);
                 }

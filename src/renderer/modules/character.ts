@@ -21,6 +21,7 @@ let currentToggleShortcut = '';
 
 // Drag Tracking
 let startPos = { x: 0, y: 0 };
+let isDragging = false; // True while user is actively dragging the window
 
 // Wiggle Detection
 let lastWiggleCheck = 0;
@@ -31,7 +32,7 @@ let isEvading = false; // Guard flag to prevent re-entry during evasion animatio
 const WIGGLE_THRESHOLD = 4; // Number of direction flips
 const WIGGLE_TIMEOUT = 500; // ms to reset
 const WIGGLE_MIN_SPEED = 5; // Minimum px movement to count as a "move"
-import { LogicalPosition } from '@tauri-apps/api/window';
+import { PhysicalPosition } from '@tauri-apps/api/window';
 
 
 
@@ -227,8 +228,19 @@ function onCharacterMouseDown(e: MouseEvent) {
         startPos = pos;
     });
 
+    // Mark as dragging to suppress wiggle detection during drag
+    isDragging = true;
+    wiggleHistory = []; // Clear any accumulated wiggle history
+
     // Universal Drag: Allow moving the window anytime
     getCurrentWindow().startDragging();
+
+    // Clear drag flag on mouseup (must listen on window since mouse leaves element during drag)
+    const onMouseUp = () => {
+        isDragging = false;
+        window.removeEventListener('mouseup', onMouseUp);
+    };
+    window.addEventListener('mouseup', onMouseUp);
 }
 
 async function onCharacterClick(e: MouseEvent) {
@@ -410,7 +422,7 @@ function onCharacterMouseMove(e: MouseEvent) {
     }
 
     // Check Trigger (skip if already evading — window movement creates fake mouse events)
-    if (wiggleHistory.length >= WIGGLE_THRESHOLD && !isEvading) {
+    if (wiggleHistory.length >= WIGGLE_THRESHOLD && !isEvading && !isDragging) {
         console.log('[Character] Wiggle Detected! Shooo!');
         wiggleHistory = []; // Reset
         moveToRandomLocation();
@@ -447,12 +459,14 @@ async function moveToRandomLocation() {
         const targetX = Math.floor(Math.random() * (maxW - padding)) + padding;
         const targetY = Math.floor(Math.random() * (maxH - padding)) + padding;
 
-        // Animation Param
-        const startX = window.screenX;
-        const startY = window.screenY;
+        // Animation Param — use Tauri's outerPosition for consistent coordinates
+        // (window.screenX/screenY is unreliable on macOS due to coordinate system differences)
+        const win = getCurrentWindow();
+        const currentPos = await win.outerPosition();
+        const startX = currentPos.x;
+        const startY = currentPos.y;
         const duration = 800; // ms
         const startTime = Date.now();
-        const win = getCurrentWindow();
 
         console.log(`[Character] Jumping to ${targetX}, ${targetY} from ${startX},${startY}`);
 
@@ -468,7 +482,7 @@ async function moveToRandomLocation() {
             const currentX = Math.round(startX + (targetX - startX) * ease);
             const currentY = Math.round(startY + (targetY - startY) * ease);
 
-            win.setPosition(new LogicalPosition(currentX, currentY)).catch(console.error);
+            win.setPosition(new PhysicalPosition(currentX, currentY)).catch(console.error);
 
             if (progress < 1) {
                 requestAnimationFrame(animate);

@@ -39,6 +39,10 @@ pub mod linux;
 #[cfg(target_os = "windows")]
 pub mod windows;
 
+/// macOS backend: Uses CoreGraphics Event Taps
+#[cfg(target_os = "macos")]
+pub mod macos;
+
 // =============================================================================
 // Backend Selection
 // =============================================================================
@@ -49,6 +53,9 @@ use linux as backend;
 
 #[cfg(target_os = "windows")]
 use windows as backend;
+
+#[cfg(target_os = "macos")]
+use macos as backend;
 
 // Re-export types needed by main.rs
 use crate::shared::SharedState;
