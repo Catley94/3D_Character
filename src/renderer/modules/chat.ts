@@ -14,7 +14,7 @@ const chatInput = document.getElementById('chat-input') as HTMLInputElement;
 const sendBtn = document.getElementById('send-btn') as HTMLButtonElement;
 
 // Constants - Dynamic sizing
-const CHARACTER_HEIGHT = 180;
+const CHARACTER_HEIGHT = 210;
 const INPUT_HEIGHT = 60;
 const EXTRA_PADDING = 30;
 const MIN_WIDTH = 200;

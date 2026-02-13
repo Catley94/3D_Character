@@ -129,6 +129,36 @@ export function initSettings() {
             console.error('[Settings] Click check failed:', e);
         }
     });
+
+    // Load External Themes
+    loadExternalThemes();
+}
+
+async function loadExternalThemes() {
+    try {
+        const externalThemes = await invoke<string[]>('list_external_themes');
+        console.log('[Settings] Loaded external themes:', externalThemes);
+
+        // Keep built-in themes (first 4 options)
+        const builtInValues = ['fox', 'dragon', 'cat', 'wolf'];
+
+        // Remove old external options if any
+        Array.from(themeSelect.options).forEach(opt => {
+            if (!builtInValues.includes(opt.value)) {
+                themeSelect.removeChild(opt);
+            }
+        });
+
+        externalThemes.forEach(theme => {
+            const opt = document.createElement('option');
+            opt.value = theme;
+            opt.textContent = `📂 ${theme}`; // Distinguish with icon
+            themeSelect.appendChild(opt);
+        });
+
+    } catch (e) {
+        console.error('[Settings] Failed to load external themes:', e);
+    }
 }
 
 export function applyConfig(cfg: any) {

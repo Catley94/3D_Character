@@ -162,6 +162,42 @@ fn update_character_bounds(state: State<Arc<SharedState>>, x: i32, y: i32, w: i3
     }];
 }
 
+/// Returns the path to the external themes directory.
+/// Creates it if it doesn't exist.
+#[tauri::command]
+fn get_themes_dir(app_handle: AppHandle) -> String {
+    let config_dir = app_handle.path().app_config_dir().unwrap();
+    let themes_dir = config_dir.join("themes");
+    if !themes_dir.exists() {
+        let _ = fs::create_dir_all(&themes_dir);
+    }
+    themes_dir.to_string_lossy().to_string()
+}
+
+/// Lists all subdirectories in the external themes directory.
+#[tauri::command]
+fn list_external_themes(app_handle: AppHandle) -> Vec<String> {
+    let config_dir = app_handle.path().app_config_dir().unwrap();
+    let themes_dir = config_dir.join("themes");
+
+    let mut themes = Vec::new();
+
+    if themes_dir.exists() {
+        if let Ok(entries) = fs::read_dir(themes_dir) {
+            for entry in entries.flatten() {
+                if let Ok(file_type) = entry.file_type() {
+                    if file_type.is_dir() {
+                        if let Ok(name) = entry.file_name().into_string() {
+                            themes.push(name);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    themes
+}
+
 // =============================================================================
 // Window Management (IPC Commands)
 // =============================================================================
@@ -226,7 +262,9 @@ fn main() {
             check_fullscreen,
             sync_cursor,
             update_interactive_bounds,
-            update_character_bounds
+            update_character_bounds,
+            get_themes_dir,
+            list_external_themes
         ])
         // Setup hook: Runs once before the main window is created
         .setup(|app| {

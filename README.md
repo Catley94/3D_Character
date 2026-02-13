@@ -372,6 +372,24 @@ cd src-tauri && cargo check
 2. Enter your **Google Gemini API Key**
 3. Click **Save**. Foxy is now ready to chat!
 
+### Custom Character Themes
+
+You can customize the character by adding your own images:
+
+1.  **Create Theme Folder**: Navigate to your configuration directory:
+    - **Linux**: `~/.config/com.sam.ai-character-assistant/themes/`
+    - **Windows**: `%APPDATA%\com.sam.ai-character-assistant\themes\`
+    
+    Create a new folder (e.g., `my_char`).
+
+2.  **Add Images**: Place your PNG images inside this folder with the following names:
+    - `idle.png` (Default state)
+    - `talking.png` (When speaking)
+    - `listening.png` (When you are typing)
+    - `clicked.png` (When clicked)
+
+3.  **Activate**: Restart the app or open **Settings** -> **Character Theme** and select your new theme (marked with 📂).
+
 ---
 
 ## 📜 License

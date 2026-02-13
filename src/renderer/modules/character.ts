@@ -274,36 +274,106 @@ export function handleCharacterClick() {
     }, 1500);
 }
 
-export function setState(newState: CharacterStateValue) {
+import { convertFileSrc } from '@tauri-apps/api/core';
+
+// ...
+
+export async function setState(newState: CharacterStateValue) {
     state.currentState = newState;
     character.className = `state-${newState}`;
 
     // Update character image based on state and theme
     const theme = state.config.theme || 'fox';
-    const basePath = `themes/${theme}`;
+    const builtInThemes = ['fox', 'dragon', 'cat', 'wolf'];
 
-    const timestamp = new Date().getTime(); // Cache buster
-    switch (newState) {
-        case CharacterState.CLICKED:
-            characterImg.src = `${basePath}/clicked.png?t=${timestamp}`;
-            break;
-        case CharacterState.LISTENING:
-            characterImg.src = `${basePath}/listening.png?t=${timestamp}`;
-            break;
-        case CharacterState.TALKING:
-            console.log(`¬ [Character] Updating image to TALKING: ${basePath}/talking.png`);
-            characterImg.src = `${basePath}/talking.png?t=${timestamp}`;
-            break;
-        default:
-            console.log("¬ State: " + newState);
-            console.log(`¬ [Character] Updating image to IDLE: ${basePath}/idle.png`);
-            characterImg.src = `${basePath}/idle.png`;
+    let basePath = '';
+
+    if (builtInThemes.includes(theme)) {
+        // Internal Asset
+        basePath = `themes/${theme}`;
+        const timestamp = new Date().getTime(); // Cache buster
+
+        switch (newState) {
+            case CharacterState.CLICKED:
+                characterImg.src = `${basePath}/clicked.png?t=${timestamp}`;
+                break;
+            case CharacterState.LISTENING:
+                characterImg.src = `${basePath}/listening.png?t=${timestamp}`;
+                break;
+            case CharacterState.TALKING:
+                characterImg.src = `${basePath}/talking.png?t=${timestamp}`;
+                break;
+            default:
+                characterImg.src = `${basePath}/idle.png`;
+        }
+    } else {
+        // External Asset
+        try {
+            const themesDir = await invoke<string>('get_themes_dir');
+            // Construct absolute path then convert to asset URL
+            // Linux: /home/user/.config/.../themes/mytheme/idle.png
+            // Windows: C:\Users\...\themes\mytheme\idle.png
+
+            // We need to handle path joining properly. 
+            // Since we are in frontend, we can't use node's path module easily without polyfills/IPC.
+            // A simple slash join works for asset URLs usually, but let's be safe.
+            // Actually, convertFileSrc expects an absolute path.
+            // We can ask backend to give us the full path to the specific image?
+            // Or just manually join since we know themesDir comes from backend with OS separators.
+            // Let's assume standard forward slashes for URL purposes or let backend helper handle it?
+            // Simpler: use the slash, Tauri handles it.
+
+            // Better approach: just use the theme name and ask backend for the full path?
+            // "themes_dir" -> /path/to/themes
+            // Image -> /path/to/themes/theme/idle.png
+
+            // Note: On Windows, path separators are backslashes.
+            // JS strings like `${dir}/${theme}` might mix slashes.
+            // `convertFileSrc` handles this generally.
+
+            // We need to know the separator or just try both?
+            // Let's rely on a helper or just append with a slash, browsers/tauri usually normalize.
+            // But to be robust, let's normalize the separator to / for the URL generation if needed,
+            // or just trust Tauri's convertFileSrc takes whatever.
+
+            const separator = navigator.userAgent.includes('Windows') ? '\\' : '/';
+            const themePath = `${themesDir}${separator}${theme}`;
+
+            let filename = 'idle.png';
+            switch (newState) {
+                case CharacterState.CLICKED: filename = 'clicked.png'; break;
+                case CharacterState.LISTENING: filename = 'listening.png'; break;
+                case CharacterState.TALKING: filename = 'talking.png'; break;
+            }
+
+            const fullPath = `${themePath}${separator}${filename}`;
+            const assetUrl = convertFileSrc(fullPath);
+
+            // console.log(`[Character] Loading external: ${fullPath} -> ${assetUrl}`);
+            characterImg.src = `${assetUrl}?t=${Date.now()}`;
+
+        } catch (e) {
+            console.error('[Character] Failed to load external theme image:', e);
+            // Fallback to fox
+            characterImg.src = `themes/fox/idle.png`;
+        }
     }
 }
 
-export function updateCharacterTheme(theme: string) {
-    const basePath = `themes/${theme}`;
-    characterImg.src = `${basePath}/idle.png`;
+export async function updateCharacterTheme(theme: string) {
+    const builtInThemes = ['fox', 'dragon', 'cat', 'wolf'];
+    if (builtInThemes.includes(theme)) {
+        characterImg.src = `themes/${theme}/idle.png`;
+    } else {
+        try {
+            const themesDir = await invoke<string>('get_themes_dir');
+            const separator = navigator.userAgent.includes('Windows') ? '\\' : '/';
+            const fullPath = `${themesDir}${separator}${theme}${separator}idle.png`;
+            characterImg.src = convertFileSrc(fullPath);
+        } catch (e) {
+            console.error('[Character] Failed to load external theme:', e);
+        }
+    }
 }
 
 function onCharacterMouseMove(e: MouseEvent) {
