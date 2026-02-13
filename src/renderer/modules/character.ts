@@ -27,6 +27,7 @@ let lastWiggleCheck = 0;
 let wiggleHistory: number[] = [];
 let lastMouseX = 0;
 let speechBubbleTimeout: number | undefined; // Store timeout ID
+let isEvading = false; // Guard flag to prevent re-entry during evasion animation
 const WIGGLE_THRESHOLD = 4; // Number of direction flips
 const WIGGLE_TIMEOUT = 500; // ms to reset
 const WIGGLE_MIN_SPEED = 5; // Minimum px movement to count as a "move"
@@ -408,8 +409,8 @@ function onCharacterMouseMove(e: MouseEvent) {
         }
     }
 
-    // Check Trigger
-    if (wiggleHistory.length >= WIGGLE_THRESHOLD) {
+    // Check Trigger (skip if already evading — window movement creates fake mouse events)
+    if (wiggleHistory.length >= WIGGLE_THRESHOLD && !isEvading) {
         console.log('[Character] Wiggle Detected! Shooo!');
         wiggleHistory = []; // Reset
         moveToRandomLocation();
@@ -417,10 +418,17 @@ function onCharacterMouseMove(e: MouseEvent) {
 }
 
 async function moveToRandomLocation() {
-    // Basic Speech
+    // Lock out re-entry — window movement creates fake mousemove events on the character
+    if (isEvading) return;
+    isEvading = true;
+
+    // Set surprised face immediately — character looks startled during the whole slide!
+    setState(CharacterState.CLICKED);
+
+    // Show speech bubble (extend timeout to outlast the full state transition sequence)
     if (!isSpeechBubbleVisible()) {
         showSpeechBubble("Whoa! What's over here? 💨");
-        setTimeout(hideSpeechBubble, 2000);
+        setTimeout(hideSpeechBubble, 3000);
     } else {
         console.log('[Character] Wiggle move, but preserving existing speech bubble.');
     }
@@ -468,6 +476,18 @@ async function moveToRandomLocation() {
                 console.log('[Character] Move Complete');
                 // Save the final position after wiggle evasion
                 saveWindowPosition();
+
+                // Movement done! Now transition through states:
+                // CLICKED (surprised) → TRANSITION (recovering) → IDLE (calm)
+                setTimeout(() => {
+                    setState(CharacterState.TRANSITION);
+
+                    setTimeout(() => {
+                        setState(CharacterState.IDLE);
+                        isEvading = false; // Unlock — full sequence complete
+                        wiggleHistory = []; // Clear any phantom wiggles accumulated during animation
+                    }, 500); // Hold transition face for 500ms
+                }, 800); // Hold surprised face for 800ms after stopping
             }
         }
 
@@ -475,6 +495,8 @@ async function moveToRandomLocation() {
 
     } catch (e) {
         console.error("Failed to move window:", e);
+        setState(CharacterState.IDLE);
+        isEvading = false; // Unlock on error too
     }
 }
 
