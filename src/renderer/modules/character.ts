@@ -5,6 +5,7 @@ import { showSpeechBubble, showChatInput, hideSpeechBubble, isSpeechBubbleVisibl
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
+import { saveWindowPosition } from '../app';
 
 // DOM Elements
 const character = document.getElementById('character') as HTMLDivElement;
@@ -465,6 +466,8 @@ async function moveToRandomLocation() {
                 requestAnimationFrame(animate);
             } else {
                 console.log('[Character] Move Complete');
+                // Save the final position after wiggle evasion
+                saveWindowPosition();
             }
         }
 

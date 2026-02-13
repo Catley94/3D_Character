@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow, PhysicalPosition, currentMonitor } from '@tauri-apps/api/window';
 import { setState } from './character';
 import { showSpeechBubble } from './chat';
+import { saveWindowPosition } from '../app';
 
 // Wiggle Detection Params
 const WIGGLE_HISTORY_SIZE = 20;
@@ -112,6 +113,9 @@ async function performEvasion() {
 
         try {
             await appWindow.setPosition(new PhysicalPosition(Math.round(newX), Math.round(newY)));
+
+            // Save the new position after evasion teleport
+            await saveWindowPosition();
 
             // 3. Fade in
             setTimeout(() => {
