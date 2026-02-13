@@ -31,7 +31,7 @@ import { initScreensaver } from './modules/screensaver';
 import { unregisterAll } from '@tauri-apps/plugin-global-shortcut';
 import { listen } from '@tauri-apps/api/event';
 import { state } from './modules/store';
-import { toggleDragMode, handleCharacterClick } from './modules/character';
+import { toggleDragMode, handleCharacterClick, setVisible } from './modules/character';
 import { activateChat } from './modules/chat';
 import { toggleScreensaver } from './modules/screensaver';
 
@@ -44,6 +44,9 @@ const appWindow = getCurrentWindow();
 
 async function init() {
     console.log('[Renderer] Initializing (Tauri)...');
+
+    // Hide character initially to prevent "foxy" flash if theme is different
+    setVisible(false);
 
     // -------------------------------------------------------------------------
     // Step 1: Clean up previous shortcuts
@@ -90,6 +93,9 @@ async function init() {
     // -------------------------------------------------------------------------
     // This updates the UI to match the saved settings (theme, shortcuts, etc.)
     applyConfig(config);
+
+    // Now show character
+    setTimeout(() => setVisible(true), 100);
 
     // -------------------------------------------------------------------------
     // Step 5: Platform-specific window setup

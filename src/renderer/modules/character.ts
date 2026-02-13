@@ -202,18 +202,21 @@ export function toggleDragMode() {
     return isDragMode;
 }
 
-export function toggleVisibility() {
-    const isVisible = characterContainer.style.opacity !== '0';
-
-    if (isVisible) {
-        console.log('[Character] Manual Toggle: HIDDEN');
-        characterContainer.style.opacity = '0';
-        characterContainer.style.pointerEvents = 'none';
-    } else {
-        console.log('[Character] Manual Toggle: VISIBLE');
+export function setVisible(visible: boolean) {
+    if (visible) {
+        console.log('[Character] Visibility: SHOW');
         characterContainer.style.opacity = '1';
         characterContainer.style.pointerEvents = 'auto';
+    } else {
+        console.log('[Character] Visibility: HIDE');
+        characterContainer.style.opacity = '0';
+        characterContainer.style.pointerEvents = 'none';
     }
+}
+
+export function toggleVisibility() {
+    const isVisible = characterContainer.style.opacity !== '0';
+    setVisible(!isVisible);
 }
 
 function onCharacterMouseDown(e: MouseEvent) {

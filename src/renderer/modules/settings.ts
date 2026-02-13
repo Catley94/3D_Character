@@ -1,4 +1,6 @@
 import { state, defaultShortcuts } from './store';
+import { THEME_NICKNAMES } from '../constants';
+
 import { updateCharacterTheme, updateDragShortcut, updateVisibilityShortcut, setInteractionOverride } from './character';
 import { showSpeechBubble, hideSpeechBubble, updateChatShortcut } from './chat';
 import { invoke } from '@tauri-apps/api/core';
@@ -56,6 +58,8 @@ export function initSettings() {
 
     saveSettingsBtn.addEventListener('click', saveSettings);
 
+
+
     geminiModel.addEventListener('change', () => {
         if (geminiModel.value === 'custom') {
             customModelInput.classList.remove('hidden');
@@ -65,8 +69,21 @@ export function initSettings() {
         }
     });
 
-    // Listen for tray event (TODO: Implement Tray in Rust)
-    // listen('open-settings', () => openSettings());
+    // Theme Change Listener - Auto-update name if it's generic
+    themeSelect.addEventListener('change', () => {
+        const newTheme = themeSelect.value;
+        const currentName = characterName.value.trim();
+
+        // Check if current name matches ANY known theme nickname
+        const isGenericName = Object.values(THEME_NICKNAMES).includes(currentName);
+
+        if (isGenericName || currentName === '') {
+            const newName = THEME_NICKNAMES[newTheme];
+            if (newName) {
+                characterName.value = newName;
+            }
+        }
+    });
 
     const startScreensaverBtn = document.getElementById('start-screensaver');
     if (startScreensaverBtn) {
@@ -75,6 +92,8 @@ export function initSettings() {
             // closeSettings(); // Handled by toggleScreensaver now
         });
     }
+
+
 
     // Backend Click Listener for Settings Icon (Windows Fallback)
     let backendStartPos = { x: 0, y: 0 };

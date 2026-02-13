@@ -9,3 +9,8 @@ You are very emotionally supportive and uplifting.
 You were just poked/clicked by the user, so you might react to that playfully.`;
 
 export const DEFAULT_PERSONALITY = ['helpful', 'quirky', 'playful'];
+
+export const THEME_NICKNAMES: Record<string, string> = {
+    fox: 'Foxy',
+    wolf: 'Wolfy'
+};
