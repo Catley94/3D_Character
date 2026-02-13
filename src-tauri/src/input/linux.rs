@@ -79,7 +79,7 @@ pub fn check_fullscreen() -> bool {
         Ok(output) => {
             let stdout = String::from_utf8_lossy(&output.stdout);
             if let Some(pos) = stdout.find("window id # ") {
-                let id_part = &stdout[pos + 12..]; 
+                let id_part = &stdout[pos + 12..];
                 id_part.trim().to_string()
             } else {
                 return false;
@@ -115,6 +115,7 @@ fn map_key_code(key: Key) -> Option<KeyCode> {
         Key::KEY_F => Some(KeyCode::F),
         Key::KEY_D => Some(KeyCode::D),
         Key::KEY_S => Some(KeyCode::S),
+        Key::KEY_C => Some(KeyCode::C),
         Key::KEY_A => Some(KeyCode::A),
         _ => None,
     }
@@ -187,9 +188,9 @@ fn classify_device(device: &Device) -> Option<DeviceType> {
 
 #[cfg(target_os = "linux")]
 fn process_device_events(
-    open_device: &mut OpenDevice, 
-    state: &mut InputState,       
-    app_handle: &AppHandle,       
+    open_device: &mut OpenDevice,
+    state: &mut InputState,
+    app_handle: &AppHandle,
 ) {
     let events: Vec<_> = match open_device.device.fetch_events() {
         Ok(events) => events.collect(),
@@ -221,7 +222,7 @@ fn process_device_events(
                     } else if is_released {
                         state.held_modifiers.remove(&shared_key);
                     }
-                     // Shortcuts
+                    // Shortcuts
                     if is_pressed {
                         if let Some(shortcut) = state.check_shortcut(shared_key) {
                             let _ = app_handle.emit(
@@ -339,13 +340,8 @@ pub fn run_input_loop(app_handle: AppHandle, shared_state: Arc<SharedState>) {
                 for (i, d) in devices.iter_mut().enumerate() {
                     if let Some(revents) = poll_fds[i].revents() {
                         if revents.contains(PollFlags::POLLIN) {
-                            let mut input_state =
-                                shared_state.input_state.lock().unwrap();
-                            process_device_events(
-                                d,
-                                &mut input_state,
-                                &app_handle,
-                            );
+                            let mut input_state = shared_state.input_state.lock().unwrap();
+                            process_device_events(d, &mut input_state, &app_handle);
                         }
                     }
                 }
@@ -360,8 +356,7 @@ pub fn run_input_loop(app_handle: AppHandle, shared_state: Arc<SharedState>) {
                                     let rel_x = buf[1] as i8 as i32;
                                     let rel_y = -(buf[2] as i8 as i32);
 
-                                    let mut input_state =
-                                        shared_state.input_state.lock().unwrap();
+                                    let mut input_state = shared_state.input_state.lock().unwrap();
                                     if input_state.update_cursor(rel_x, rel_y) {
                                         let _ = app_handle.emit(
                                             "cursor-pos",
@@ -372,7 +367,7 @@ pub fn run_input_loop(app_handle: AppHandle, shared_state: Arc<SharedState>) {
                                         );
                                     }
                                     if (buf[0] & 1) != 0 {
-                                         let _ = app_handle.emit(
+                                        let _ = app_handle.emit(
                                             "click",
                                             OutputEvent::Click {
                                                 button: "left".into(),

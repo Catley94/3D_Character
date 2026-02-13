@@ -14,8 +14,8 @@ use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};
 #[cfg(target_os = "windows")]
 use windows::Win32::System::LibraryLoader::GetModuleHandleA;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    VIRTUAL_KEY, VK_A, VK_CONTROL, VK_D, VK_F, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_MENU,
-    VK_RCONTROL, VK_RMENU, VK_RSHIFT, VK_RWIN, VK_S, VK_SHIFT,
+    VIRTUAL_KEY, VK_A, VK_C, VK_CONTROL, VK_D, VK_F, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN,
+    VK_MENU, VK_RCONTROL, VK_RMENU, VK_RSHIFT, VK_RWIN, VK_S, VK_SHIFT,
 };
 #[cfg(target_os = "windows")]
 use windows::Win32::UI::Input::{
@@ -79,6 +79,7 @@ fn map_vkey(vkey: VIRTUAL_KEY) -> Option<KeyCode> {
         VK_F => Some(KeyCode::F),
         VK_D => Some(KeyCode::D),
         VK_S => Some(KeyCode::S),
+        VK_C => Some(KeyCode::C),
         VK_A => Some(KeyCode::A),
         _ => None,
     }

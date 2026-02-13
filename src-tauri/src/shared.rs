@@ -50,6 +50,7 @@ pub enum KeyCode {
     F, // Toggle chat (Meta+Shift+F)
     D, // Toggle drag mode (Meta+Shift+D)
     S, // Toggle screensaver (Meta+Shift+S)
+    C, // Center character on screen (Meta+Shift+C)
     A, // Reserved for future use
 
     // Legacy/unused variants (kept for compatibility)
@@ -231,6 +232,7 @@ impl InputState {
     /// - Meta+Shift+F: "toggle_chat"
     /// - Meta+Shift+D: "toggle_drag"
     /// - Meta+Shift+S: "toggle_screensaver"
+    /// - Meta+Shift+C: "center_character"
     pub fn check_shortcut(&self, trigger_key: KeyCode) -> Option<&'static str> {
         // Check if Meta (Super/Windows) key is held
         let meta_held =
@@ -245,6 +247,7 @@ impl InputState {
                 KeyCode::F => return Some("toggle_chat"),
                 KeyCode::D => return Some("toggle_drag"),
                 KeyCode::S => return Some("toggle_screensaver"),
+                KeyCode::C => return Some("center_character"),
                 _ => {}
             }
         }

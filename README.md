@@ -32,6 +32,7 @@ A cute, interactive AI companion that lives on your desktop. Foxy (or your custo
     - **ON**: Window becomes opaque and clickable everywhere. You can drag Foxy to a new spot.
     - **OFF**: Window becomes "ghostly" again (clicks pass through except on Foxy).
 - **`Meta + Shift + S`** (Super+Shift+S): **Screensaver Mode**. Full-screen character wanders around.
+- **`Meta + Shift + C`** (Super+Shift+C): **Center Character**. Moves the character to the center of the screen. Useful if it gets lost off-screen!
 
 ### Installation & Development
 1.  **Install Dependencies**:
@@ -168,6 +169,7 @@ graph TD
      - `initScreensaver()` - Screensaver mode
   4. Apply loaded configuration
   5. Set up event listeners for backend events
+  6. Register `beforeunload` handler to save window position on close
 
 ---
 
@@ -197,7 +199,7 @@ graph LR
 - **Device Discovery**: Scans `/dev/input/event*` for mice and keyboards
 - **Event Loop**: Uses `select()` to poll multiple devices efficiently
 - **Cursor Tracking**: Accumulates relative mouse movements
-- **Shortcuts**: Detects `Meta+Shift+F/D/S` combinations
+- **Shortcuts**: Detects `Meta+Shift+F/D/S/C` combinations
 - **Fullscreen Detection**: Queries X11 window properties
 
 #### 2.2. Windows Backend (`input/windows.rs`)
@@ -332,7 +334,7 @@ The speech bubble visibility is managed directly via DOM class (`hidden`). We ad
 ### Our Solution
 1. **Raw Input Reading**: `/dev/input/event*` for global cursor tracking and shortcuts
 2. **Always-on-Top Strategy**: On Wayland sessions, the app automatically forces `GDK_BACKEND=x11` (XWayland) where `set_always_on_top` works reliably
-3. **Shortcut Detection**: Detect `Meta+Shift+F/D/S` globally via `/dev/input`
+3. **Shortcut Detection**: Detect `Meta+Shift+F/D/S/C` globally via `/dev/input`
 4. **Event Emission**: Send events to frontend via Tauri IPC
 
 ---
