@@ -32,7 +32,7 @@ let isEvading = false; // Guard flag to prevent re-entry during evasion animatio
 const WIGGLE_THRESHOLD = 4; // Number of direction flips
 const WIGGLE_TIMEOUT = 500; // ms to reset
 const WIGGLE_MIN_SPEED = 5; // Minimum px movement to count as a "move"
-import { PhysicalPosition } from '@tauri-apps/api/window';
+import { PhysicalPosition, LogicalPosition } from '@tauri-apps/api/window';
 
 
 
@@ -423,13 +423,59 @@ function onCharacterMouseMove(e: MouseEvent) {
 
     // Check Trigger (skip if already evading — window movement creates fake mouse events)
     if (wiggleHistory.length >= WIGGLE_THRESHOLD && !isEvading && !isDragging) {
-        console.log('[Character] Wiggle Detected! Shooo!');
+        console.log('[Character] Wiggle Detected! Calculating Escape...');
+
+        const rect = character.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+
+        const mouseX = e.clientX;
+        const mouseY = e.clientY;
+
+        // precise vector from center to mouse
+        const deltaX = mouseX - centerX;
+        const deltaY = mouseY - centerY;
+
+        // Calculate Angle in Degrees (0 = Right, 90 = Bottom, 180 = Left, -90 = Top)
+        const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+
+        // Determine 8-way direction for clearer logging
+        let direction = '';
+        if (angle >= -22.5 && angle < 22.5) direction = 'RIGHT';
+        else if (angle >= 22.5 && angle < 67.5) direction = 'BOTTOM-RIGHT';
+        else if (angle >= 67.5 && angle < 112.5) direction = 'BOTTOM';
+        else if (angle >= 112.5 && angle < 157.5) direction = 'BOTTOM-LEFT';
+        else if (angle >= 157.5 || angle < -157.5) direction = 'LEFT';
+        else if (angle >= -157.5 && angle < -112.5) direction = 'TOP-LEFT';
+        else if (angle >= -112.5 && angle < -67.5) direction = 'TOP';
+        else if (angle >= -67.5 && angle < -22.5) direction = 'TOP-RIGHT';
+
+        console.log(`[Character] Mouse Logic 2D:
+        - Center: ${centerX}, ${centerY}
+        - Mouse: ${mouseX}, ${mouseY}
+        - Vector: ${deltaX}, ${deltaY}
+        - Angle: ${angle.toFixed(1)}°
+        - Detected Position: ${direction}
+        - Escape Vector: ${-deltaX}, ${-deltaY} (Opposite)
+        `);
+
+        // Normalize Escape Vector
+        const len = Math.sqrt(deltaX * deltaX + deltaY * deltaY) || 1;
+        const escapeX = -deltaX / len; // Opposite X
+        const escapeY = -deltaY / len; // Opposite Y
+
         wiggleHistory = []; // Reset
-        moveToRandomLocation();
+
+        // Pass estimated window position in case outerPosition fails? 
+        // We can estimate window top-left from mouse screen - mouse client
+        const estWinX = e.screenX - e.clientX;
+        const estWinY = e.screenY - e.clientY;
+
+        moveToRandomLocation(escapeX, escapeY, { x: estWinX, y: estWinY });
     }
 }
 
-async function moveToRandomLocation() {
+async function moveToRandomLocation(dirX?: number, dirY?: number, estimatedStart?: { x: number, y: number }) {
     // Lock out re-entry — window movement creates fake mousemove events on the character
     if (isEvading) return;
     isEvading = true;
@@ -450,25 +496,69 @@ async function moveToRandomLocation() {
         const screenW = window.screen.availWidth;
         const screenH = window.screen.availHeight;
 
-        // Pad from edges
-        const padding = 50;
-        const maxW = screenW - 300;
-        const maxH = screenH - 350;
-
-        // Target Random X/Y
-        const targetX = Math.floor(Math.random() * (maxW - padding)) + padding;
-        const targetY = Math.floor(Math.random() * (maxH - padding)) + padding;
-
-        // Animation Param — use Tauri's outerPosition for consistent coordinates
-        // (window.screenX/screenY is unreliable on macOS due to coordinate system differences)
         const win = getCurrentWindow();
-        const currentPos = await win.outerPosition();
-        const startX = currentPos.x;
-        const startY = currentPos.y;
+        const size = await win.outerSize();
+        let curPos = await win.outerPosition();
+
+        // Fallback if outerPosition is 0,0 (Linux/Wayland issue)
+        if (curPos.x === 0 && curPos.y === 0) {
+            if (estimatedStart) {
+                console.warn(`[Character] outerPosition (0,0). Using Mouse Estimate: ${estimatedStart.x}, ${estimatedStart.y}`);
+                const dpr = window.devicePixelRatio || 1;
+                // Mouse estimate is usually Logical (screenX is logical in browsers mostly)
+                // But setPosition expects Physical or Logical depending on API.
+                // curPos for calculation should ideally be consistent with setPosition inputs.
+                curPos = new PhysicalPosition(Math.round(estimatedStart.x * dpr), Math.round(estimatedStart.y * dpr));
+            } else {
+                console.warn('[Character] outerPosition (0,0) and no estimate. Using window.screenX/Y');
+                const dpr = window.devicePixelRatio || 1;
+                curPos = new PhysicalPosition(Math.round(window.screenX * dpr), Math.round(window.screenY * dpr));
+            }
+        }
+
+        const startX = curPos.x;
+        const startY = curPos.y;
+
+        // Pad from edges
+        const padding = 20;
+        const winW = size.width;
+        const winH = size.height;
+
+        let targetX: number, targetY: number;
+
+        if (dirX !== undefined && dirY !== undefined) {
+            // Directional Move
+            const moveDist = 300 + Math.random() * 200; // 300-500px jump
+
+            // Calculate target purely based on direction
+            targetX = startX + (dirX * moveDist);
+            targetY = startY + (dirY * moveDist);
+
+            console.log(`[Character] Directional Plan: Start(${startX},${startY}) Vec(${dirX.toFixed(2)},${dirY.toFixed(2)}) Dist(${moveDist.toFixed(0)}) -> Raw(${targetX.toFixed(0)},${targetY.toFixed(0)})`);
+
+            // Clamp to screen bounds
+            const minX = padding;
+            const maxX = Math.max(minX, screenW - winW - padding);
+            const minY = padding;
+            const maxY = Math.max(minY, screenH - winH - padding);
+
+            targetX = Math.max(minX, Math.min(targetX, maxX));
+            targetY = Math.max(minY, Math.min(targetY, maxY));
+
+        } else {
+            // Random Fallback
+            const maxW = screenW - winW - padding;
+            const maxH = screenH - winH - padding;
+            targetX = Math.floor(Math.random() * (maxW - padding)) + padding;
+            targetY = Math.floor(Math.random() * (maxH - padding)) + padding;
+        }
+
+        console.log(`[Character] Final Target: ${Math.round(targetX)}, ${Math.round(targetY)}`);
+
+        // Animation Loop
         const duration = 800; // ms
         const startTime = Date.now();
-
-        console.log(`[Character] Jumping to ${targetX}, ${targetY} from ${startX},${startY}`);
+        const dpr = window.devicePixelRatio || 1;
 
         function animate() {
             const now = Date.now();
@@ -482,7 +572,8 @@ async function moveToRandomLocation() {
             const currentX = Math.round(startX + (targetX - startX) * ease);
             const currentY = Math.round(startY + (targetY - startY) * ease);
 
-            win.setPosition(new PhysicalPosition(currentX, currentY)).catch(console.error);
+            // Using LogicalPosition for Wayland compatibility attempt
+            win.setPosition(new LogicalPosition(currentX / dpr, currentY / dpr)).catch(console.error);
 
             if (progress < 1) {
                 requestAnimationFrame(animate);
@@ -506,6 +597,7 @@ async function moveToRandomLocation() {
         }
 
         requestAnimationFrame(animate);
+
 
     } catch (e) {
         console.error("Failed to move window:", e);
