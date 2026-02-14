@@ -394,6 +394,41 @@ You can customize the character by adding your own images:
 
 ---
 
+---
+
+## 🚀 Release Process
+
+### Option 1: Automated Release (Recommended)
+
+To release a new version (e.g., `1.0.1`):
+
+1.  **Run the release command**:
+    ```bash
+    npm run release 1.0.1
+    ```
+    This command runs a helper script that will:
+    -   **Sync Versions**: Updates `package.json`, `tauri.conf.json`, and `Cargo.toml` to `1.0.1`.
+    -   **Commit**: Creates a commit "chore: release v1.0.1".
+    -   **Tag**: Creates a git tag `v1.0.1`.
+    -   **Push**: Pushes code and tags to GitHub.
+
+2.  **Wait**: GitHub Actions will detect the new tag, build:
+    -   **Linux**: `.deb` (Debian/Ubuntu), `.rpm` (Fedora/OpenSUSE), `.AppImage` (Arch/All)
+    -   **Windows**: `.exe` and `.msi`
+    and publish them as a GitHub Release.
+
+### Option 2: Manual Local Build
+
+If you want to build and upload manually without pushing to GitHub:
+
+1.  **Build & Release**:
+    ```bash
+    ./scripts/manual_release.sh
+    ```
+    *(Note: You must have `gh` CLI installed and authenticated)*
+
+---
+
 ## 📜 License
 
 MIT
