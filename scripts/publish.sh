@@ -47,7 +47,15 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
-git push origin main
+# Get current branch name
+CURRENT_BRANCH=$(git branch --show-current)
+
+if [ -z "$CURRENT_BRANCH" ]; then
+    echo "Error: Could not determine current branch."
+    exit 1
+fi
+
+git push origin "$CURRENT_BRANCH"
 git push origin "v$NEW_VERSION"
 
 echo "✅ Done! GitHub Actions will now build and release v$NEW_VERSION."
