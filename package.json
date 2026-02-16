@@ -1,6 +1,6 @@
 {
   "name": "ai-character-assistant",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "description": "A cute AI companion that floats on your desktop",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -10,7 +10,8 @@
     "build": "tsc && vite build",
     "tauri:build": "tauri build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "release": "./scripts/publish.sh"
   },
   "keywords": [
     "ai",
