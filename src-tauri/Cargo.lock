@@ -30,7 +30,7 @@ dependencies = [
 
 [[package]]
 name = "ai-character-assistant"
-version = "0.1.0"
+version = "1.0.1"
 dependencies = [
  "cocoa",
  "core-foundation 0.9.4",
