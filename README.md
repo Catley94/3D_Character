@@ -396,7 +396,7 @@ You can customize the character by adding your own images:
 
 ## 📜 License
 
-MIT
+
 
 ---
 
