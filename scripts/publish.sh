@@ -24,14 +24,15 @@ echo "🚀 Starting release process for version $NEW_VERSION..."
 echo "📝 Updating version in configuration files..."
 node scripts/set_version.js "$NEW_VERSION"
 
-# 2. Build logic? 
-# No, we rely on GitHub Actions for the build.
-# But we might want to check if it builds locally? 
-# Optional: npm run tauri build -- --debug (Too slow for just a version bump)
+# 2. Update Cargo.lock
+echo "🦀 Updating Cargo.lock..."
+cd src-tauri
+cargo check # This triggers Cargo.lock update
+cd ..
 
-# 3. Commit changes
+# 3. Commit changes (including Cargo.lock)
 echo "💾 Committing changes..."
-git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
+git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
 git commit -m "chore: release v$NEW_VERSION"
 
 # 4. Create Git tag
