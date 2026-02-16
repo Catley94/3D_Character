@@ -1,6 +1,6 @@
 {
   "name": "ai-character-assistant",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A cute AI companion that floats on your desktop",
   "main": "dist-electron/main.js",
   "scripts": {
