@@ -1,5 +1,4 @@
 import { GoogleGenAI } from '@google/genai';
-import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { DEFAULT_CHARACTER_NAME, DEFAULT_GEMINI_MODEL, DEFAULT_PERSONALITY, SYSTEM_PROMPT_TEMPLATE } from '../constants';
 
 /**
@@ -31,8 +30,7 @@ export class GeminiService {
             // 3. Initialize AI 
             // We use tauriFetch to bypass CORS restrictions on the experimental Interactions API
             const ai = new GoogleGenAI({
-                apiKey: config.geminiApiKey,
-                httpOptions: { fetch: tauriFetch } as any
+                apiKey: config.geminiApiKey
             });
             const selectedModel = config.geminiModel || DEFAULT_GEMINI_MODEL;
             console.log(`[Gemini] USING MODEL: ${selectedModel}`);
@@ -105,8 +103,7 @@ export class GeminiService {
         if (!config.geminiApiKey) return '';
         try {
             const ai = new GoogleGenAI({
-                apiKey: config.geminiApiKey,
-                httpOptions: { fetch: tauriFetch } as any
+                apiKey: config.geminiApiKey
             });
             const selectedModel = config.geminiModel || DEFAULT_GEMINI_MODEL;
 

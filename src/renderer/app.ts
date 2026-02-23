@@ -41,6 +41,7 @@ import { ollamaService } from './services/ollama';
 import { toggleDragMode, handleCharacterClick, setVisible } from './modules/character';
 import { activateChat } from './modules/chat';
 import { toggleScreensaver } from './modules/screensaver';
+import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 
 const appWindow = getCurrentWindow();
 
@@ -102,6 +103,23 @@ async function centerCharacterOnScreen() {
 
 async function init() {
     console.log('[Renderer] Initializing (Tauri)...');
+
+    // =========================================================================
+    // MONKEY-PATCH FETCH FOR CORS BYPASS
+    // =========================================================================
+    // The @google/genai SDK natively uses `window.fetch` which gets blocked
+    // by browser CORS policy when hitting the experimental Interactions API.
+    // We intercept any request to Google APIs and route it through Tauri's
+    // Rust-backed HTTP plugin, bypassing all Chromium CORS checks!
+    const originalFetch = window.fetch;
+    window.fetch = async (input, init) => {
+        const urlStr = typeof input === 'string' ? input : (input instanceof Request ? input.url : input.toString());
+        if (urlStr.includes('generativelanguage.googleapis.com')) {
+            console.log(`[CORS Bypass] Routing request through Tauri: ${urlStr}`);
+            return await tauriFetch(input, init);
+        }
+        return originalFetch(input, init);
+    };
 
     // Hide character initially to prevent "foxy" flash if theme is different
     setVisible(false);
