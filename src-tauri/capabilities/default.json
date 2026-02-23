@@ -19,6 +19,13 @@
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister-all",
     "global-shortcut:default",
-    "http:default"
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "https://*.googleapis.com/*"
+        }
+      ]
+    }
   ]
 }
