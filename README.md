@@ -1,6 +1,6 @@
 # AI Character Assistant 🦊
 
-A cute, interactive AI companion that lives on your desktop. Foxy (or your custom character) floats above your windows, reacts to your clicks, and chats with you using Google's Gemini AI.
+A cute, interactive AI companion that lives on your desktop. Foxy (or your custom character) floats above your windows, reacts to your clicks, and chats with you using Google's Gemini AI or a local Ollama model. 🦙
 
 ---
 
@@ -9,7 +9,7 @@ A cute, interactive AI companion that lives on your desktop. Foxy (or your custo
 - **Always on Top**: Floats over other windows.
 - **Click-Through**: Only interactive parts (character, chat bubble) capture mouse events; the rest lets you click through to your work.
 - **Interactive**: Reacts to clicks, drag-and-drop, and conversations.
-- **AI Powered**: Integrated with Google Gemini for personality-driven chat.
+- **AI Powered**: Integrated with Google Gemini or **Ollama** (local LLM) for personality-driven chat — no API key needed with Ollama!
 - **Customizable**: Change themes, names, and personality traits.
 - **Linux Native**: Direct integration with Linux input subsystems for global cursor tracking and shortcuts, even on Wayland.
 - **Wiggle Detection**: Move your mouse quickly over the character and it will scurry away! 🏃
@@ -51,6 +51,14 @@ A cute, interactive AI companion that lives on your desktop. Foxy (or your custo
     ```
     *(Note: This generates installable `.deb` and `.AppImage` files in `src-tauri/target/release/bundle/`)*
 
+## 🧠 Adaptive Memory System
+
+The AI companion uses state-of-the-art memory management techniques to provide a natural, continuous relationship over time:
+
+1. **Short-Term Context Window (Session Memory)**: Maintains a rolling buffer of your recent conversation. This ensures the AI understands immediate context without overflowing local model token limits.
+2. **Episodic Long-Term Memory (Summarization)**: When the conversation gets long, or when you close the application, the AI automatically curates a condensed "Session Summary" of the important events and facts learned.
+3. **Hybrid Recall**: Every new message is injected with both the short-term context and the long-term summaries, acting as an active "external brain" for the otherwise stateless LLMs.
+
 ---
 
 ## 🏗️ Architecture
@@ -82,12 +90,12 @@ The project is built with **Tauri** (Rust backend), **TypeScript** frontend, and
         │                                       │
         ▼                                       ▼
 ┌──────────────────┐                  ┌──────────────────┐
-│  Shared State    │                  │  Google Gemini   │
-│ (Arc<Mutex>)     │                  │  AI Service      │
-│                  │                  │                  │
-│  • cursor_x/y    │                  │  • Chat API      │
-│  • modifiers     │                  │  • Responses     │
-│  • shortcuts     │                  │                  │
+│  Shared State    │                  │  AI Services     │
+│ (Arc<Mutex>)     │                  │                  │
+│                  │                  │  • Gemini (API)  │
+│  • cursor_x/y    │                  │  • Ollama (Local)│
+│  • modifiers     │                  │  • Chat routing  │
+│  • shortcuts     │                  │  • Responses     │
 └──────────────────┘                  └──────────────────┘
 ```
 
@@ -118,7 +126,8 @@ The project is built with **Tauri** (Rust backend), **TypeScript** frontend, and
     │   ├── lighting.ts     # Day/night lighting effects
     │   └── screensaver.ts  # Screensaver mode
     └── services/
-        └── gemini.ts       # Google Gemini AI API client
+        ├── gemini.ts       # Google Gemini AI API client
+        └── ollama.ts       # Local Ollama LLM client
 ```
 
 ---
@@ -300,7 +309,8 @@ sequenceDiagram
 | **`modules/interactions.ts`** | Click-through logic | `setupClickThrough()`, `updateInteractiveState()` |
 | **`modules/settings.ts`** | Settings UI | `initSettings()`, `applyConfig()`, `saveSettings()` |
 | **`modules/screensaver.ts`** | Screensaver mode | `initScreensaver()`, `toggleScreensaver()` |
-| **`services/gemini.ts`** | AI integration | `generateResponse()`, `GeminiService` class |
+| **`services/gemini.ts`** | Gemini AI integration | `generateResponse()`, `GeminiService` class |
+| **`services/ollama.ts`** | Local Ollama LLM | `generateResponse()`, `listModels()`, `testConnection()` |
 
 ---
 
@@ -370,9 +380,32 @@ cd src-tauri && cargo check
 5. **Frontend** (`store.ts`): Add to `defaultShortcuts`
 
 ### Initial Setup for Users
+
+#### Option A: Google Gemini (Cloud)
 1. Click the **Backpack Icon** 🎒 (appears on hover) to open Settings
-2. Enter your **Google Gemini API Key**
-3. Click **Save**. Foxy is now ready to chat!
+2. Select **Gemini** as the AI Provider
+3. Enter your **Google Gemini API Key**
+4. Click **Save**. Foxy is now ready to chat!
+
+#### Option B: Ollama (Local — No API Key!) 🦙
+1. **Install Ollama**: Visit [ollama.com](https://ollama.com/) and follow the install instructions
+2. **Pull a model**:
+    ```bash
+    ollama pull llama3.2
+    ```
+3. **Start Ollama** (if not auto-started):
+    ```bash
+    ollama serve
+    ```
+4. Open **Settings** → Select **Ollama (Local) 🦙** as the AI Provider
+5. The app will auto-detect your installed models. Select one from the dropdown
+6. Click **🔌 Test Connection** to verify Ollama is reachable
+7. Click **Save**. Foxy now chats 100% locally! 🎉
+
+> **Recommended models for speech bubbles** (short, fast responses work best):
+> - `llama3.2` — Great balance of speed and quality
+> - `phi3` — Very fast, good for quick reactions
+> - `mistral` — Solid general-purpose model
 
 ### Custom Character Themes
 
@@ -441,6 +474,7 @@ Created with love by Sam. Character design and concept inspired by desktop compa
 
 Powered by:
 - [Tauri](https://tauri.app/) - Rust-powered desktop framework
-- [Google Gemini](https://ai.google.dev/) - AI chat integration
+- [Google Gemini](https://ai.google.dev/) - Cloud AI chat integration
+- [Ollama](https://ollama.com/) - Local LLM support 🦙
 - [evdev](https://gitlab.freedesktop.org/libevdev/libevdev) (Linux) - Input device library
 - [Win32 API](https://learn.microsoft.com/en-us/windows/win32/) (Windows) - Windows input handling

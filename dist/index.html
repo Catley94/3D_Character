@@ -55,24 +55,58 @@
         <label for="api-provider">AI Provider</label>
         <select id="api-provider">
           <option value="gemini">Gemini</option>
+          <option value="ollama">Ollama (Local) 🦙</option>
           <option value="openai" disabled>OpenAI (coming soon)</option>
-          <option value="ollama" disabled>Ollama (coming soon)</option>
         </select>
       </div>
 
-      <div class="setting-group">
-        <label for="api-key">API Key</label>
-        <input type="password" id="api-key" placeholder="Enter your API key">
+      <!-- Gemini-specific settings (shown when provider = gemini) -->
+      <div id="gemini-settings">
+        <div class="setting-group">
+          <label for="api-key">API Key</label>
+          <input type="password" id="api-key" placeholder="Enter your Gemini API key">
+        </div>
+
+        <div class="setting-group">
+          <label for="gemini-model">Gemini Model</label>
+          <select id="gemini-model">
+            <option value="gemini-2.5-flash">Gemini 2.5 Flash (new)</option>
+            <option value="custom">Custom Model ID...</option>
+          </select>
+          <input type="text" id="custom-model-input" placeholder="e.g. gemini-1.5-pro-002" class="hidden"
+            style="margin-top: 5px;">
+        </div>
       </div>
 
-      <div class="setting-group">
-        <label for="gemini-model">Gemini Model</label>
-        <select id="gemini-model">
-          <option value="gemini-2.5-flash">Gemini 2.5 Flash (new)</option>
-          <option value="custom">Custom Model ID...</option>
-        </select>
-        <input type="text" id="custom-model-input" placeholder="e.g. gemini-1.5-pro-002" class="hidden"
-          style="margin-top: 5px;">
+      <!-- Ollama-specific settings (shown when provider = ollama) -->
+      <div id="ollama-settings" class="hidden">
+        <div class="setting-group">
+          <label for="ollama-url">Ollama URL</label>
+          <input type="text" id="ollama-url" placeholder="http://localhost:11434" value="http://localhost:11434">
+        </div>
+
+        <div class="setting-group">
+          <label for="ollama-model">Ollama Model</label>
+          <div style="display: flex; gap: 5px; align-items: center;">
+            <select id="ollama-model" style="flex: 1;">
+              <option value="llama3.2">llama3.2</option>
+            </select>
+            <button id="refresh-ollama-models" title="Refresh model list"
+              style="padding: 5px 10px; background: #6366f1; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 0.9em;">
+              🔄
+            </button>
+          </div>
+          <input type="text" id="ollama-custom-model" placeholder="e.g. mistral, codellama" class="hidden"
+            style="margin-top: 5px;">
+        </div>
+
+        <div class="setting-group">
+          <button id="test-ollama-connection"
+            style="width: 100%; padding: 8px; background: #10b981; border: none; border-radius: 8px; color: white; cursor: pointer;">
+            🔌 Test Connection
+          </button>
+          <p id="ollama-connection-status" style="font-size: 0.8em; margin-top: 5px; color: #aaa;"></p>
+        </div>
       </div>
 
       <div class="setting-group">

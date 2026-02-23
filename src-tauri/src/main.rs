@@ -23,6 +23,10 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use tauri::{AppHandle, Manager, State};
 
+// ... (omitting lines for brevity in prompt, but I will target the imports block)
+
+// Actually better to just target the import block and then separate chunks for the exit calls.
+
 // =============================================================================
 // Module Imports
 // =============================================================================
@@ -261,6 +265,9 @@ fn main() {
             load_config,
             check_fullscreen,
             sync_cursor,
+            update_interactive_bounds,
+            update_character_bounds,
+            get_themes_dir,
             update_interactive_bounds,
             update_character_bounds,
             get_themes_dir,
