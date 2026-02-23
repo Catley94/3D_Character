@@ -259,6 +259,8 @@ fn main() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         // Plugin: Logging to stdout/file
         .plugin(tauri_plugin_log::Builder::default().build())
+        // Plugin: HTTP for bypassing CORS
+        .plugin(tauri_plugin_http::init())
         // Register all IPC commands that the frontend can invoke
         .invoke_handler(tauri::generate_handler![
             save_config,

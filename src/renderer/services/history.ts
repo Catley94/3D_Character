@@ -1,5 +1,6 @@
 
 import { emit } from '../modules/store';
+import { geminiService } from './gemini';
 
 export interface ChatMessage {
     role: 'user' | 'model';
@@ -63,6 +64,7 @@ export class HistoryService {
     public clear() {
         this.state = { shortTerm: [], longTerm: '' };
         this.save();
+        geminiService.clearMemory();
         console.log('[History] Memory cleared.');
     }
 
