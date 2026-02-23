@@ -46,9 +46,7 @@ export class GeminiService {
             const interactionConfig: any = {
                 model: selectedModel,
                 input: message,
-                config: {
-                    systemInstruction: systemPrompt
-                }
+                system_instruction: systemPrompt
             };
 
             // If we have a previous interaction ID from this session, we pass it to continue the state
