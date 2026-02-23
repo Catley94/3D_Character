@@ -51,6 +51,14 @@ A cute, interactive AI companion that lives on your desktop. Foxy (or your custo
     ```
     *(Note: This generates installable `.deb` and `.AppImage` files in `src-tauri/target/release/bundle/`)*
 
+## 🧠 Adaptive Memory System
+
+The AI companion uses state-of-the-art memory management techniques to provide a natural, continuous relationship over time:
+
+1. **Short-Term Context Window (Session Memory)**: Maintains a rolling buffer of your recent conversation. This ensures the AI understands immediate context without overflowing local model token limits.
+2. **Episodic Long-Term Memory (Summarization)**: When the conversation gets long, or when you close the application, the AI automatically curates a condensed "Session Summary" of the important events and facts learned.
+3. **Hybrid Recall**: Every new message is injected with both the short-term context and the long-term summaries, acting as an active "external brain" for the otherwise stateless LLMs.
+
 ---
 
 ## 🏗️ Architecture

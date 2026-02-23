@@ -35,6 +35,9 @@ import { initScreensaver } from './modules/screensaver';
 import { unregisterAll } from '@tauri-apps/plugin-global-shortcut';
 import { listen } from '@tauri-apps/api/event';
 import { state } from './modules/store';
+import { historyService } from './services/history';
+import { geminiService } from './services/gemini';
+import { ollamaService } from './services/ollama';
 import { toggleDragMode, handleCharacterClick, setVisible } from './modules/character';
 import { activateChat } from './modules/chat';
 import { toggleScreensaver } from './modules/screensaver';
@@ -238,9 +241,46 @@ async function init() {
     // Tauri's close-requested event fires before the window is destroyed,
     // giving us time to await async operations (unlike beforeunload).
     appWindow.onCloseRequested(async (event) => {
-        console.log('[Renderer] Window close requested, saving position...');
+        // Prevent default close immediately so we can finish async saves
+        event.preventDefault();
+        console.log('\n[Renderer] =======================================');
+        console.log('[Renderer] 🛑 Window close requested by user (Alt+F4 / Close Button)');
+        console.log('[Renderer] =======================================\n');
+
+        console.log('[Renderer] Step 1: Saving window position...');
         await saveWindowPosition();
-        // Allow the window to close after saving
+
+        console.log('[Renderer] Step 2: Triggering memory consolidation (End of Session)...');
+        // Choose the correct AI provider to perform the final summarization
+
+        let provider;
+        switch (state.config.provider) {
+            case 'ollama':
+                provider = ollamaService;
+                break;
+            case 'gemini':
+            default:
+                // Defaulting to Gemini as the primary robust provider
+                provider = geminiService;
+                break;
+        }
+
+        console.log(`[Renderer] Selected AI Provider for summarization: ${state.config.provider || 'gemini'}`);
+
+        try {
+            console.log('[Renderer] Calling historyService.endSession()...');
+            const saved = await historyService.endSession(state.config, provider.summarize.bind(provider));
+            if (saved) {
+                console.log('[Renderer] ✅ Session memory successfully summarized and saved to long-term storage.');
+            } else {
+                console.log('[Renderer] ℹ️ No short-term memory to save (buffer was empty).');
+            }
+        } catch (e) {
+            console.error('[Renderer] ❌ Failed to save session memory during shutdown:', e);
+        }
+
+        console.log('[Renderer] Step 3: All shutdown tasks complete. Destroying window...');
+        appWindow.destroy();
     });
 
     console.log('[Renderer] Ready!');

@@ -1,7 +1,9 @@
-import { state, CharacterState, defaultShortcuts } from './store';
+import { state, CharacterState, defaultShortcuts, on, emit } from './store';
 import { setState } from './character';
 import { geminiService } from '../services/gemini';
 import { ollamaService } from '../services/ollama';
+import { historyService, ChatMessage } from '../services/history';
+import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { unregister, register } from '@tauri-apps/plugin-global-shortcut';
 
@@ -69,6 +71,32 @@ export function initChat() {
             }, TYPING_TIMEOUT_MS);
         }
     });
+
+    // Listen for memory consolidation requests
+    on('consolidation-needed', async () => {
+        console.log('[Chat] Logic: Consolidation needed triggered.');
+        const messages = historyService.getMessagesToConsolidate();
+        if (messages.length === 0) return;
+
+        console.log(`[Chat] Consolidating ${messages.length} messages...`);
+
+        // Convert messages to text for summarization
+        const textToSummarize = messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n');
+
+        // Use current provider to summarize
+        const provider = state.config.provider === 'ollama' ? ollamaService : geminiService;
+
+        // Don't block UI, just do it in background
+        try {
+            const summary = await provider.summarize(textToSummarize, state.config);
+            if (summary) {
+                historyService.applyConsolidation(summary, messages.length);
+            }
+        } catch (e) {
+            console.error('[Chat] Consolidation failed:', e);
+        }
+    });
+
 }
 
 // ===== Shortcuts Logic =====
@@ -415,17 +443,44 @@ async function sendMessage() {
         const provider = state.config.provider || 'gemini';
         console.log(`[Chat] Using provider: ${provider}`);
 
-        const result = provider === 'ollama'
-            ? await ollamaService.generateResponse(message, state.config)
-            : await geminiService.generateResponse(message, state.config);
+        // 1. Add User Message to History
+        historyService.addMessage('user', message);
+
+        // 2. Get Context (History + Summary)
+        const { history, summary } = historyService.getContext();
+
+
+        // 3. Generate Response with Context
+        /**
+         * Time to consult the AI oracle! 🧠 
+         * We route the context to the selected provider to generate a thoughtful response.
+         */
+        let result;
+        switch (provider) {
+            case 'ollama':
+                // Keeping it local with Ollama! 🏠
+                result = await ollamaService.generateResponse(message, history, summary, state.config);
+                break;
+            case 'gemini':
+            default:
+                // Gemini is our trusty default brain, always ready to help! 🚀
+                result = await geminiService.generateResponse(message, history, summary, state.config);
+                break;
+        }
 
         if (result.error) {
             setState(CharacterState.TALKING);
             showSpeechBubble(`Oops! ${result.error} 😅`);
+            // Optionally remove the user message if it failed? Or keep it?
         } else {
             console.log("Setting to TALKING");
             setState(CharacterState.TALKING);
             await showSpeechBubble(result.response || '');
+
+            // 4. Add AI Response to History
+            if (result.response) {
+                historyService.addMessage('model', result.response);
+            }
         }
 
         unlockWindow();
