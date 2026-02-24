@@ -265,6 +265,20 @@ async function init() {
         console.log('[Renderer] 🛑 Window close requested by user (Alt+F4 / Close Button)');
         console.log('[Renderer] =======================================\n');
 
+        // Apply fade-out class to make the character disappear visually right away
+        document.body.classList.add('fade-out-app');
+
+        // Wait for the CSS transition (0.5s) to largely complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Hide the native window so it's no longer interactable/visible while saving memory
+        try {
+            await appWindow.hide();
+            console.log('[Renderer] Native window hidden to prevent click-through issues.');
+        } catch (e) {
+            console.warn('[Renderer] Failed to hide native window:', e);
+        }
+
         console.log('[Renderer] Step 1: Saving window position...');
         await saveWindowPosition();
 
