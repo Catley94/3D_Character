@@ -4,6 +4,7 @@ import { OllamaService } from '../services/ollama';
 
 import { updateCharacterTheme, updateDragShortcut, updateVisibilityShortcut, setInteractionOverride } from './character';
 import { showSpeechBubble, hideSpeechBubble, updateChatShortcut } from './chat';
+import { historyService } from '../services/history';
 import { invoke } from '@tauri-apps/api/core';
 import { toggleScreensaver, updateScreensaverShortcut } from './screensaver';
 import { listen } from '@tauri-apps/api/event';
@@ -120,6 +121,20 @@ export function initSettings() {
         startScreensaverBtn.addEventListener('click', () => {
             toggleScreensaver();
             // closeSettings(); // Handled by toggleScreensaver now
+        });
+    }
+
+    const clearMemoryBtn = document.getElementById('clear-memory-btn');
+    if (clearMemoryBtn) {
+        clearMemoryBtn.addEventListener('click', () => {
+            const confirmed = window.confirm(
+                "WARNING: DESTRUCTIVE ACTION\n\nAre you absolutely sure you want to delete ALL short-term and long-term memory?\nThis cannot be undone."
+            );
+            if (confirmed) {
+                historyService.clear();
+                showSpeechBubble("All memory has been wiped clean! ✨", false);
+                setTimeout(hideSpeechBubble, 3000);
+            }
         });
     }
 
